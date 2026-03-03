@@ -5,6 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 import numpy as np
+import threading
 
 ARECORD_DEVICE = "plughw:2,0"
 RATE = 16000
@@ -35,6 +36,17 @@ How it works:
   - Type a label (e.g., sl) and press Enter
   - It records exactly 1 second per label
 """
+
+def wait_for_quit(stop_event: threading.Event):
+    while not stop_event.is_set():
+        try:
+            s = input().strip().lower()
+        except EOFError:
+            stop_event.set()
+            return
+        if s == "q":
+            stop_event.set()
+            return
 
 def timestamp():
     return dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -101,6 +113,7 @@ def main():
     p.add_argument("--out", default="dataset", help="Output directory")
     p.add_argument("--normalize", action="store_true", help="Shared RMS normalize (same gain both channels)")
     p.add_argument("--count", type=int, default=0, help="Stop after N clips (0 = until quit)")
+    p.add_argument("--label", default=None, help="Continuous mode label key (sl/sc/sr/hl/hc/hr/n). Type 'q' + Enter to stop.")
     args = p.parse_args()
 
     out_root = Path(args.out)
@@ -112,6 +125,49 @@ def main():
     print(HELP_TEXT)
 
     saved = 0
+
+    if args.label is not None:
+        key = args.label.strip().lower()
+        if key not in COMMANDS:
+            print("Unknown --label. Must be one of:", ", ".join(COMMANDS.keys()))
+            sys.exit(2)
+
+        event, direction = COMMANDS[key]
+        print(f"Continuous mode: recording '{event}_{direction}' once per second.")
+        print("Type 'q' then Enter to stop.\n")
+        print("(Start your sound, then press Enter here if you want; it will keep recording regardless.)")
+
+        stop_event = threading.Event()
+        t = threading.Thread(target=wait_for_quit, args=(stop_event,), daemon=True)
+        t.start()
+
+        try:
+            while not stop_event.is_set():
+                raw = record_1s_raw_int32_stereo()
+                x = int32_to_float32_unit(raw)
+                if args.normalize:
+                    x = shared_rms_normalize(x)
+
+                fname = f"{timestamp()}_{event}_{direction}.npy"
+                fpath = clips_dir / fname
+                np.save(fpath, x.astype(np.float32))
+
+                append_manifest(manifest, fpath, event, direction, args.normalize)
+
+                peak = float(np.max(np.abs(x)))
+                saved += 1
+                print(f"[{saved}] Saved {fname} shape={x.shape} peak={peak:.3f}")
+
+                if args.count and saved >= args.count:
+                    break
+        except KeyboardInterrupt:
+            print("\nStopped.")
+
+        stop_event.set()
+        print(f"Done. Total clips saved: {saved}")
+        print(f"Manifest: {manifest}")
+        return
+
     try:
         while True:
             cmd = input("label> ").strip().lower()
