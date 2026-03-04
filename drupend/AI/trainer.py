@@ -5,7 +5,7 @@ from tensorflow.keras import layers
 import numpy as np
 import pandas as pd
 from training import find_epochs, train_model
-from create_model import create_mlp_model, INPUT_DIMENSION, NUM_CLASSES, DROPOUT
+from create_model import create_mlp_model, INPUT_DIMENSION, NUM_CLASSES, DROPOUT, create_spec_cnn
 from sklearn.metrics import confusion_matrix, classification_report
 
 training_data = training_data_from_manifest(
@@ -20,9 +20,9 @@ print("x_train:", x_train.shape, x_train.dtype)
 print("y_train:", y_train.shape, y_train.dtype)
 print("First label:", y_train[0])
 
-model = create_mlp_model(INPUT_DIMENSION, NUM_CLASSES, DROPOUT)
+model = create_spec_cnn(input_shape=x_train.shape[1:], NUM_CLASSES) 
 
-best_epoch = find_epochs(model, training_data, version=0, max_epochs=100, patience=3)
+best_epoch = find_epochs(model, training_data, version=0, max_epochs=100, patience=5)
 print("Best epoch:", best_epoch)
 
 train_model(model, training_data, best_epoch)
