@@ -4,7 +4,14 @@ from tensorflow.keras import layers
 import numpy as np
 import pandas as pd
 
+# TODO: shuffle training data before input
+
 def find_epochs(model, training_data, version=-1, max_epochs=100, patience=3):
+  """
+  model: tensorflow H5 model object
+  training_data: tuple of (input, output) from func format_training_data
+  version: just for csv naming and visualization (if you want to save, put at > -1)
+  """
   x_train, y_train = training_data
 
   early_stop = keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
@@ -45,6 +52,14 @@ def train_model(model, training_data, optimal_epochs):
   )
 
 def format_traing_data(inputs, outputs):
+  """
+  Each input array corresponds to one output array
+  
+  Input format: 1 second of samples from 1 mic
+  Output format: [% confidence of siren, % confidence of honk, % confidence of noise]
+
+  For sending to frontend: pick one with highest confidence
+  """
   x_train = np.array(inputs).reshape(len(inputs), 16000).astype('float32')
   y_train = np.array(outputs).reshape(len(outputs), 3).astype('float32')
   return (x_train, y_train)
