@@ -87,6 +87,22 @@ def load_manifest_dataset_channels_as_examples(
     print("Manifest rows:", len(df))
     print(df["event"].value_counts())
 
+    print("Original distribution:")
+    print(df["event"].value_counts())
+
+    noise_df = df[df["event"] == "noise"]
+    honk_df = df[df["event"] == "honk"]
+    siren_df = df[df["event"] == "siren"]
+
+    target = min(len(honk_df), len(siren_df))
+
+    noise_df = noise_df.sample(n=target, random_state=seed)
+
+    df = pd.concat([noise_df, honk_df, siren_df])
+
+    print("After undersampling:")
+    print(df["event"].value_counts())
+
     if shuffle:
         df = df.sample(frac=1.0, random_state=seed).reset_index(drop=True)
 
