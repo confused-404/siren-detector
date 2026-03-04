@@ -15,6 +15,12 @@ training_data = training_data_from_manifest(
 
 model = keras.models.load_model("car_alert_model.h5")
 
+model.compile(
+    optimizer=keras.optimizers.Adam(),
+    loss="categorical_crossentropy",
+    metrics=["accuracy"],
+)
+
 best_epoch = find_epochs(model, training_data, version=0, max_epochs=100, patience=3)
 print("Best epoch:", best_epoch)
 
