@@ -2,9 +2,11 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 #note:6000 samples first
-input_dimension = 16000
-num_classes = 3
-dropout = 0.45 #0.3 OG
+
+INPUT_DIMENSION = 16000
+NUM_CLASSES = 3
+DROPOUT = 0.45 #0.3 OG
+
 def create_mlp_model(input_dimension, num_classes, dropout):
 
     model = keras.Sequential([
@@ -31,7 +33,7 @@ def create_mlp_model(input_dimension, num_classes, dropout):
     return model
 
 
-mlp_model = create_mlp_model(input_dimension, num_classes, dropout)
+mlp_model = create_mlp_model(INPUT_DIMENSION, NUM_CLASSES, DROPOUT)
 
 mlp_model.save("car_alert_model.h5")
 # Display the model summary
