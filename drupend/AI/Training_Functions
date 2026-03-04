@@ -1,0 +1,50 @@
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+import numpy as np
+import pandas as pd
+
+def find_epochs(model, training_data, version=-1, max_epochs=100, patience=3):
+  x_train, y_train = training_data
+
+  early_stop = keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
+  history = model.fit(
+    x_train, y_train,
+    epochs=max_epochs, #upper limit
+    validation_split=0.2,
+    callbacks=[early_stop]
+  )
+
+  if version>-1:
+    # needs pandas
+    history_df = pd.DataFrame(history.history)
+    history_df['epoch'] = range(1, len(history_df) + 1)
+
+    # Ensure 'accuracy' and 'val_accuracy' columns exist, fill with NaN otherwise
+    if 'accuracy' not in history_df.columns:
+      history_df['accuracy'] = float('nan')
+    if 'val_accuracy' not in history_df.columns:
+      history_df['val_accuracy'] = float('nan')
+
+    # Select columns to save
+    columns_to_save = ['epoch', 'loss', 'val_loss', 'accuracy', 'val_accuracy']
+    columns_to_save = [col for col in columns_to_save if col in history_df.columns]
+
+    csv_filename=f"accuracy_history_v{version}"
+    history_df[columns_to_save].to_csv(csv_filename, index=False)
+    print(f"Training history saved to {csv_filename}")
+
+  best_epoch = np.argmin(history.history['val_loss']) + 1
+  return best_epoch
+
+def train_model(model, training_data, optimal_epochs):
+  x_train, y_train = training_data
+  model.fit(
+    x_train, y_train,
+    epochs=optimal_epochs
+  )
+
+def format_traing_data(inputs, outputs):
+  x_train = np.array(inputs).reshape(len(inputs), 16000).astype('float32')
+  y_train = np.array(outputs).reshape(len(outputs), 3).astype('float32')
+  return (x_train, y_train)
