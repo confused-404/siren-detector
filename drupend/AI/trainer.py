@@ -20,7 +20,7 @@ print("x_train:", x_train.shape, x_train.dtype)
 print("y_train:", y_train.shape, y_train.dtype)
 print("First label:", y_train[0])
 
-model = create_spec_cnn(input_shape=x_train.shape[1:], NUM_CLASSES) 
+model = create_spec_cnn(input_shape=x_train.shape[1:], num_classes=NUM_CLASSES) 
 
 best_epoch = find_epochs(model, training_data, version=0, max_epochs=100, patience=5)
 print("Best epoch:", best_epoch)
