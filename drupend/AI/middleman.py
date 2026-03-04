@@ -94,7 +94,8 @@ def load_manifest_dataset_channels_as_examples(
     honk_df = df[df["event"] == "honk"]
     siren_df = df[df["event"] == "siren"]
 
-    target = min(len(honk_df), len(siren_df))
+    target = min(len(honk_df), len(siren_df)) * 2
+    target = min(target, len(noise_df))
 
     noise_df = noise_df.sample(n=target, random_state=seed)
 
