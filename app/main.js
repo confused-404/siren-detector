@@ -1,8 +1,8 @@
 import './style.css'
 
 // True -> test mode | False -> pi data collection
-const SIMULATE = true;
-const PI_URL = 'http://localhost:3000/api/status'; // Put in Pi's IP Address
+const SIMULATE = false;
+const PI_URL = `${window.location.origin}/api/status`; 
 
 const MAPPING = {
   s: 'blue',
