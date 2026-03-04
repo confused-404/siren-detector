@@ -33,7 +33,7 @@ def create_mlp_model(input_dimension, num_classes, dropout):
 
 mlp_model = create_mlp_model(input_dimension, num_classes, dropout)
 
-mlp_model.save("Car_Alert_Model.h5")
+mlp_model.save("car_alert_model.h5")
 # Display the model summary
 mlp_model.summary()
 print("Made and Saved")
