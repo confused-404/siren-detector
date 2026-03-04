@@ -84,11 +84,17 @@ def load_manifest_dataset_channels_as_examples(
     if "file" not in df.columns or "event" not in df.columns:
         raise ValueError(f"Manifest must have columns ['file','event']. Found: {list(df.columns)}")
 
+    print("Manifest rows:", len(df))
+    print(df["event"].value_counts())
+
     if shuffle:
         df = df.sample(frac=1.0, random_state=seed).reset_index(drop=True)
 
     x_list = []
     y_list = []
+
+    kept = 0
+    dropped = 0
 
     for i, row in df.iterrows():
         rel_path = str(row["file"])
@@ -107,16 +113,13 @@ def load_manifest_dataset_channels_as_examples(
 
         y = _one_hot(label)
 
-        kept = 0
-        dropped = 0
-
         for ex in examples:
             if not _passes_peak_filter(ex, peak_limit):
                 dropped += 1
                 continue
 
             kept += 1
-            
+
             if normalize:
                 peak = np.max(np.abs(ex)) + 1e-9
                 ex = ex / peak
@@ -124,8 +127,8 @@ def load_manifest_dataset_channels_as_examples(
             x_list.append(ex.astype(np.float32))
             y_list.append(y)
 
-        print(f"Kept {kept} channel examples")
-        print(f"Dropped {dropped} channel examples above {peak_limit}")
+    print(f"Kept {kept} channel examples")
+    print(f"Dropped {dropped} channel examples above {peak_limit}")
 
     x_train = np.stack(x_list, axis=0).astype(np.float32)
     y_train = np.stack(y_list, axis=0).astype(np.float32)
