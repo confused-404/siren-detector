@@ -66,6 +66,7 @@ def load_manifest_dataset_channels_as_examples(
     shuffle: bool = True,
     seed: int = 1337,
     normalize: bool = False,
+    peak_limit: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Reads manifest and loads .npy stereo clips.
@@ -110,7 +111,7 @@ def load_manifest_dataset_channels_as_examples(
         dropped = 0
 
         for ex in examples:
-            if not _passes_peak_filter(ex, 0.5):
+            if not _passes_peak_filter(ex, peak_limit):
                 dropped += 1
                 continue
 
@@ -124,7 +125,7 @@ def load_manifest_dataset_channels_as_examples(
             y_list.append(y)
 
         print(f"Kept {kept} channel examples")
-        print(f"Dropped {dropped} channel examples")
+        print(f"Dropped {dropped} channel examples above {peak_limit}")
 
     x_train = np.stack(x_list, axis=0).astype(np.float32)
     y_train = np.stack(y_list, axis=0).astype(np.float32)
