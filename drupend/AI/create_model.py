@@ -26,7 +26,7 @@ def create_mlp_model(input_dimension, num_classes, dropout):
     ])
 
 
-    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
     return model
 
