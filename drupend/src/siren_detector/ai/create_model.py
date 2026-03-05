@@ -32,10 +32,29 @@ def create_mlp_model(input_dimension, num_classes, dropout):
 
     return model
 
+def create_spec_cnn(input_shape=(126, 257, 1), num_classes=3):
+    model = keras.Sequential([
+        keras.Input(shape=input_shape),
 
-mlp_model = create_mlp_model(INPUT_DIMENSION, NUM_CLASSES, DROPOUT)
+        layers.Conv2D(16, (3,3), activation="relu", padding="same"),
+        layers.MaxPooling2D((2,2)),
 
-mlp_model.save("car_alert_model.h5")
-# Display the model summary
-mlp_model.summary()
-print("Made and Saved")
+        layers.Conv2D(32, (3,3), activation="relu", padding="same"),
+        layers.MaxPooling2D((2,2)),
+
+        layers.Conv2D(64, (3,3), activation="relu", padding="same"),
+        layers.MaxPooling2D((2,2)),
+
+        layers.Flatten(),
+        layers.Dense(128, activation="relu"),
+        layers.Dropout(0.3),
+
+        layers.Dense(num_classes, activation="softmax")
+    ])
+
+    model.compile(
+        optimizer=keras.optimizers.Adam(),
+        loss="categorical_crossentropy",
+        metrics=["accuracy"],
+    )
+    return model

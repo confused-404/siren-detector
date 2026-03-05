@@ -2,6 +2,7 @@
 import os
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 
 LABELS = ["siren", "honk", "noise"]
 LABEL_TO_INDEX = {name: i for i, name in enumerate(LABELS)}
@@ -13,6 +14,27 @@ def _fix_length(audio_1d: np.ndarray, target_len: int = 16000) -> np.ndarray:
     if a.shape[0] > target_len:
         return a[:target_len]
     return np.pad(a, (0, target_len - a.shape[0]), mode="constant")
+
+def waveform_to_logspec(waveform_1d: np.ndarray,
+                        frame_length: int = 512,
+                        frame_step: int = 128,
+                        fft_length: int = 512) -> np.ndarray:
+    """
+    waveform_1d: shape (16000,)
+    returns: log spectrogram, shape (time_frames, freq_bins)
+    """
+    w = tf.convert_to_tensor(waveform_1d, dtype=tf.float32)
+    stft = tf.signal.stft(
+        w,
+        frame_length=frame_length,
+        frame_step=frame_step,
+        fft_length=fft_length,
+        window_fn=tf.signal.hann_window,
+        pad_end=True
+    )  # (frames, fft_bins)
+    mag = tf.abs(stft)
+    logmag = tf.math.log(mag + 1e-6)
+    return logmag.numpy().astype(np.float32)
 
 def _passes_peak_filter(audio: np.ndarray, peak_limit: float = 0.5) -> bool:
     """
@@ -141,13 +163,16 @@ def load_manifest_dataset_channels_as_examples(
                 peak = np.max(np.abs(ex)) + 1e-9
                 ex = ex / peak
 
-            x_list.append(ex.astype(np.float32))
+            spec = waveform_to_logspec(ex)
+            spec = (spec - spec.mean()) / (spec.std() + 1e-6)
+            x_list.append(spec)
             y_list.append(y)
 
     print(f"Kept {kept} channel examples")
     print(f"Dropped {dropped} channel examples above {peak_limit}")
 
     x_train = np.stack(x_list, axis=0).astype(np.float32)
+    x_train = x_train[..., np.newaxis]
     y_train = np.stack(y_list, axis=0).astype(np.float32)
     return x_train, y_train
 
