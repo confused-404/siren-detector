@@ -1,0 +1,55 @@
+/* Global Reset */
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    background-color: white;
+    color: black;
+    font-family: system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+}
+
+.container {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    height: 100vh;
+    width: 100vw;
+    gap: 10px;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+.box {
+    flex: 1;
+    flex-shrink: 1;
+    min-width: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 4px solid #333;
+    border-radius: 15px;
+    background-color: white;
+    font-size: 1.5rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    transition: background 0.1s ease;
+}
+
+@keyframes flash-animation {
+    0% { opacity: 1; }
+    50% { opacity: 0.4; }
+    100% { opacity: 1; }
+}
+
+.is-active {
+    animation: flash-animation 0.5s infinite;
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+}
+
+@media (max-width: 450px) {
+    .box { font-size: 0.8rem; border-width: 2px; }
+    .container { gap: 5px; padding: 5px; }
+}
