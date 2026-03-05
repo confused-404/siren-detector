@@ -11,7 +11,9 @@ app = FastAPI()
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DIST_DIR = REPO_ROOT / "app" / "dist"
 
-cfg = DetectorConfig()
+cfg = DetectorConfig(
+    model_path=str(REPO_ROOT / "drupend" / "src" / "siren_detector" / "ai" / "trained_car_alert_model.h5")
+)
 detector = LiveDetector(cfg)
 
 @app.on_event("startup")
