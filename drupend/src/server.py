@@ -16,7 +16,9 @@ detector = LiveDetector(cfg)
 
 @app.on_event("startup")
 def startup():
+    print("SERVER STARTUP: starting detector...")
     detector.start()
+    print("SERVER STARTUP: detector.start() returned")
 
 @app.on_event("shutdown")
 def shutdown():

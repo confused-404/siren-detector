@@ -89,6 +89,7 @@ class LiveDetector:
         self._latest: Dict[str, object] = {"sound": "n", "direction": 0}
 
     def start(self):
+        print("DETECTOR: start() called")
         if self._running:
             return
         self._running = True
@@ -105,6 +106,7 @@ class LiveDetector:
             return dict(self._latest)
 
     def _loop(self):
+        print("DETECTOR: loop running")
         cfg = self.cfg
         block_len = int(cfg.sample_rate * cfg.block_seconds)
         hop_len = int(cfg.sample_rate * cfg.hop_seconds)
