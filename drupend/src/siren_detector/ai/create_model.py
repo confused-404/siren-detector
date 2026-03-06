@@ -58,3 +58,37 @@ def create_spec_cnn(input_shape=(126, 257, 1), num_classes=3):
         metrics=["accuracy"],
     )
     return model
+
+def create_spec_cnn_with_custom_dropouts(input_shape=(126, 257, 1), num_classes=3):
+    def get_layer_dropout(layer: str) -> float:
+        return float(input(f"Dropout for layer [{layer}]: "))
+
+    model = keras.Sequential([
+        keras.Input(shape=input_shape),
+
+        layers.Conv2D(16, (3,3), activation="relu", padding="same"),
+        layers.MaxPooling2D((2,2)),
+        layers.Dropout(get_layer_dropout("conv_block_1")),
+
+        layers.Conv2D(32, (3,3), activation="relu", padding="same"),
+        layers.MaxPooling2D((2,2)),
+        layers.Dropout(get_layer_dropout("conv_block_2")),
+
+        layers.Conv2D(64, (3,3), activation="relu", padding="same"),
+        layers.MaxPooling2D((2,2)),
+        layers.Dropout(get_layer_dropout("conv_block_3")),
+
+        layers.Flatten(),
+
+        layers.Dense(128, activation="relu"),
+        layers.Dropout(get_layer_dropout("dense_layer")),
+
+        layers.Dense(num_classes, activation="softmax")
+    ])
+
+    model.compile(
+        optimizer=keras.optimizers.Adam(),
+        loss="categorical_crossentropy",
+        metrics=["accuracy"],
+    )
+    return model
