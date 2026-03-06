@@ -24,7 +24,7 @@ class DetectorConfig:
     frame_step: int = 128
     fft_length: int = 512
 
-    mic_distance_m: float = 0.35 # TODO: measure and edit
+    mic_distance_m: float = 0.1 # TODO: measure and edit
     speed_of_sound: float = 343.0
     direction_deadband_deg: float = 10.0
 
@@ -68,6 +68,7 @@ def tau_to_direction(tau: float, cfg: DetectorConfig) -> int:
     Convention:
       - If tau > 0 => left channel leads right => sound from LEFT => direction = -1
       - If tau < 0 => right leads left => sound from RIGHT => direction = +1
+    nevermind doesn't work let's just flip
     """
     s = (tau * cfg.speed_of_sound) / max(cfg.mic_distance_m, 1e-6)
     s = float(np.clip(s, -1.0, 1.0))
@@ -75,7 +76,7 @@ def tau_to_direction(tau: float, cfg: DetectorConfig) -> int:
 
     if abs(theta) <= cfg.direction_deadband_deg:
         return 0
-    return -1 if theta > 0 else 1
+    return -1 if theta < 0 else 1
 
 
 class LiveDetector:
