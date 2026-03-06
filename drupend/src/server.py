@@ -4,23 +4,31 @@ from fastapi.responses import FileResponse
 import random
 from pathlib import Path
 import os
+from live_detector import LiveDetector, DetectorConfig
 
 app = FastAPI()
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DIST_DIR = REPO_ROOT / "app" / "dist"
 
-def get_current_status():
-    sounds = ['s', 'h', 'n']
-    dirs = [-1, 0, 1]
-    return {
-        "sound": random.choice(sounds),
-        "direction": random.choice(dirs)
-    }
+cfg = DetectorConfig(
+    model_path=str(REPO_ROOT / "drupend" / "src" / "siren_detector" / "ai" / "trained_car_alert_model.h5")
+)
+detector = LiveDetector(cfg)
+
+@app.on_event("startup")
+def startup():
+    print("SERVER STARTUP: starting detector...")
+    detector.start()
+    print("SERVER STARTUP: detector.start() returned")
+
+@app.on_event("shutdown")
+def shutdown():
+    detector.stop()
 
 @app.get("/api/status")
 def status():
-    return get_current_status()
+    return detector.get_status()
 
 if not DIST_DIR.exists():
     raise RuntimeError(f"Frontend dist not found at: {DIST_DIR}")
