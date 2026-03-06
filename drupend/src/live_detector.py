@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from typing import Optional, Dict
 import numpy as np
 import tensorflow as tf
-import sounddevice as sd
 from siren_detector.ai.middleman import waveform_to_logspec
+import subprocess
 
 LABELS = ["siren", "honk", "noise"]
 LABEL_TO_CHAR = {"siren": "s", "honk": "h", "noise": "n"}
@@ -31,6 +31,9 @@ class DetectorConfig:
     smooth_alpha: float = 0.6
 
     device: Optional[int] = None
+    
+    arecord_device: str = "plughw:2,0"
+    arecord_format: str = "S32_LE"
 
 def gcc_phat_tdoa(x: np.ndarray, y: np.ndarray, fs: int) -> float:
     """
@@ -88,84 +91,126 @@ class LiveDetector:
 
         self._latest: Dict[str, object] = {"sound": "n", "direction": 0}
 
+        self._audio_lock = threading.Lock()
+        self._audio_buf = np.zeros((0, cfg.channels), dtype=np.float32)
+        self._cap_thread: Optional[threading.Thread] = None
+
+    def _read_exact(self, pipe, nbytes: int) -> bytes:
+        out = bytearray()
+        while len(out) < nbytes and self._running:
+            chunk = pipe.read(nbytes - len(out))
+            if not chunk:
+                return b""
+            out.extend(chunk)
+        return bytes(out)
+
     def start(self):
         print("DETECTOR: start() called")
         if self._running:
             return
         self._running = True
-        self._thread = threading.Thread(target=self._loop, daemon=True)
+
+        self._cap_thread = threading.Thread(target=self._capture_loop, daemon=True)
+        self._cap_thread.start()
+
+        self._thread = threading.Thread(target=self._infer_loop, daemon=True)
         self._thread.start()
 
     def stop(self):
         self._running = False
         if self._thread:
             self._thread.join(timeout=2)
+        if self._cap_thread:
+            self._cap_thread.join(timeout=2)
 
     def get_status(self) -> Dict[str, object]:
         with self._lock:
             return dict(self._latest)
 
-    def _loop(self):
-        print("DETECTOR: loop running")
+    def _capture_loop(self):
         cfg = self.cfg
         block_len = int(cfg.sample_rate * cfg.block_seconds)
         hop_len = int(cfg.sample_rate * cfg.hop_seconds)
 
-        buffer = np.zeros((0, cfg.channels), dtype=np.float32)
+        bytes_per_sample = 4  # S32_LE
+        frame_bytes = hop_len * cfg.channels * bytes_per_sample
 
-        with sd.InputStream(
-            samplerate=cfg.sample_rate,
-            channels=cfg.channels,
-            dtype="float32",
-            blocksize=hop_len,
-            device=cfg.device
-        ) as stream:
+        cmd = [
+            "arecord",
+            "-D", cfg.arecord_device,
+            "-f", cfg.arecord_format,
+            "-r", str(cfg.sample_rate),
+            "-c", str(cfg.channels),
+            "-t", "raw",
+            "--buffer-size=262144",
+            "--period-size=32768",
+            "-q",
+        ]
 
+        print("DETECTOR: capture loop starting arecord...")
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+        try:
             while self._running:
-                chunk, _ = stream.read(hop_len)
-                if chunk is None or len(chunk) == 0:
+                if proc.poll() is not None:
+                    print("DETECTOR: arecord died, restarting...")
+                    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+                assert proc.stdout is not None
+                raw = self._read_exact(proc.stdout, frame_bytes)
+                if not raw or len(raw) != frame_bytes:
                     continue
 
-                buffer = np.concatenate([buffer, chunk], axis=0)
+                audio_i32 = np.frombuffer(raw, dtype=np.int32).astype(np.float32)
+                audio_i32 /= 2147483648.0  # -> [-1,1]
+                chunk = audio_i32.reshape(hop_len, cfg.channels)
 
-                if buffer.shape[0] > block_len:
-                    buffer = buffer[-block_len:, :]
+                with self._audio_lock:
+                    self._audio_buf = np.concatenate([self._audio_buf, chunk], axis=0)
+                    if self._audio_buf.shape[0] > block_len:
+                        self._audio_buf = self._audio_buf[-block_len:, :]
+        finally:
+            try:
+                proc.kill()
+            except Exception:
+                pass
 
-                if buffer.shape[0] < block_len:
-                    continue 
+    def _infer_loop(self):
+        print("DETECTOR: infer loop running")
+        cfg = self.cfg
+        block_len = int(cfg.sample_rate * cfg.block_seconds)
 
-                left = buffer[:, 0].astype(np.float32)
-                right = buffer[:, 1].astype(np.float32)
+        while self._running:
+            time.sleep(cfg.hop_seconds)
 
-                peak = max(float(np.max(np.abs(left))), float(np.max(np.abs(right))))
-                if peak >= cfg.peak_limit:
+            with self._audio_lock:
+                if self._audio_buf.shape[0] < block_len:
                     continue
+                window = self._audio_buf.copy()
 
-                spec_l = waveform_to_logspec(left, cfg.frame_length, cfg.frame_step, cfg.fft_length)
-                spec_r = waveform_to_logspec(right, cfg.frame_length, cfg.frame_step, cfg.fft_length)
+            left = window[:, 0].astype(np.float32)
+            right = window[:, 1].astype(np.float32)
 
-                x_l = spec_l[..., np.newaxis]
-                x_r = spec_r[..., np.newaxis]
+            peak = max(float(np.max(np.abs(left))), float(np.max(np.abs(right))))
+            if peak >= cfg.peak_limit:
+                continue
 
-                X = np.stack([x_l, x_r], axis=0).astype(np.float32)
+            spec_l = waveform_to_logspec(left, cfg.frame_length, cfg.frame_step, cfg.fft_length)
+            spec_r = waveform_to_logspec(right, cfg.frame_length, cfg.frame_step, cfg.fft_length)
 
-                probs = self.model.predict(X, verbose=0)
-                probs_mean = probs.mean(axis=0).astype(np.float32)
+            X = np.stack([spec_l[..., np.newaxis], spec_r[..., np.newaxis]], axis=0).astype(np.float32)
 
-                self._ema_probs = (
-                    cfg.smooth_alpha * self._ema_probs + (1.0 - cfg.smooth_alpha) * probs_mean
-                )
+            probs = self.model.predict(X, verbose=0)
+            probs_mean = probs.mean(axis=0).astype(np.float32)
 
-                idx = int(np.argmax(self._ema_probs))
-                label = LABELS[idx]
+            self._ema_probs = cfg.smooth_alpha * self._ema_probs + (1.0 - cfg.smooth_alpha) * probs_mean
 
-                tau = gcc_phat_tdoa(left, right, cfg.sample_rate)
-                direction = tau_to_direction(tau, cfg) if label != "noise" else 0
+            idx = int(np.argmax(self._ema_probs))
+            label = LABELS[idx]
 
-                status = {
-                    "sound": LABEL_TO_CHAR[label],
-                    "direction": int(direction),
-                }
+            tau = gcc_phat_tdoa(left, right, cfg.sample_rate)
+            direction = tau_to_direction(tau, cfg) if label != "noise" else 0
 
-                with self._lock:
-                    self._latest = status
+            status = {"sound": LABEL_TO_CHAR[label], "direction": int(direction)}
+            with self._lock:
+                self._latest = status
