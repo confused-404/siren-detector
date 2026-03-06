@@ -195,8 +195,14 @@ class LiveDetector:
             if peak >= cfg.peak_limit:
                 continue
 
+            def standardize(spec: np.ndarray) -> np.ndarray:
+                return (spec - spec.mean()) / (spec.std() + 1e-6)
+
             spec_l = waveform_to_logspec(left, cfg.frame_length, cfg.frame_step, cfg.fft_length)
             spec_r = waveform_to_logspec(right, cfg.frame_length, cfg.frame_step, cfg.fft_length)
+
+            spec_l = standardize(spec_l)
+            spec_r = standardize(spec_r)
 
             X = np.stack([spec_l[..., np.newaxis], spec_r[..., np.newaxis]], axis=0).astype(np.float32)
 
