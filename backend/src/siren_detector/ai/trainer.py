@@ -1,11 +1,6 @@
 from middleman import training_data_from_manifest
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
-import numpy as np
-import pandas as pd
 from training import find_epochs, train_model
-from create_model import create_mlp_model, INPUT_DIMENSION, NUM_CLASSES, DROPOUT, create_spec_cnn, create_spec_cnn_with_custom_dropouts
+from create_model import NUM_CLASSES, create_spec_cnn_with_custom_dropouts
 from sklearn.metrics import confusion_matrix, classification_report
 
 training_data = training_data_from_manifest(
