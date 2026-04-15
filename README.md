@@ -203,12 +203,12 @@ DetectorConfig(
 
 To retrain the model with custom data:
 
-1. **Prepare dataset** using [backend/src/siren_detector/record_dataset.py](backend/src/siren_detector/record_dataset.py)
+1. **Prepare dataset** using [backend/scripts/record_dataset.py](backend/scripts/record_dataset.py)
 
-2. **Train model** using [backend/src/siren_detector/ai/trainer.py](backend/src/siren_detector/ai/trainer.py)
+2. **Train model** using [backend/scripts/trainer.py](backend/scripts/trainer.py)
    ```bash
-   cd backend
-   poetry run python -m siren_detector.ai.trainer
+   cd backend/scripts
+   poetry run python trainer.py
    ```
 
 The trainer will:
@@ -243,17 +243,20 @@ siren-detector/
 │   └── package.json
 └── backend/                         # Python backend
     ├── pyproject.toml
+    ├── scripts/                     # Training and model creation scripts
+    │   ├── record_dataset.py       # Dataset recording utility
+    │   ├── trainer.py              # Main training script
+    │   ├── utils.py                # Training utility functions
+    │   └── helpers/                # Training helper modules
+    │       ├── create_model.py     # Model architecture definitions
+    │       ├── middleman.py        # Data loading and preprocessing
+    │       └── training.py         # Training utilities and functions
     ├── src/
     │   ├── server.py               # FastAPI server
     │   ├── live_detector.py        # Real-time detection engine
+    │   ├── utils.py                # Runtime utility functions
     │   └── siren_detector/
-    │       ├── record_dataset.py   # Dataset recording utility
-    │       └── ai/
-    │           ├── create_model.py # Model architecture
-    │           ├── trainer.py      # Training script
-    │           ├── training.py     # Training utilities
-    │           ├── middleman.py    # Audio processing
-    │           └── trained_car_alert_model.h5  # Pre-trained model
+    │       └── trained_car_alert_model.h5  # Pre-trained model
     └── tests/
 ```
 

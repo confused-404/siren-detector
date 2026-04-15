@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from typing import List, Tuple
+from helpers.utils import waveform_to_logspec 
 
 LABELS = ["siren", "honk", "noise"]
 LABEL_TO_INDEX = {name: i for i, name in enumerate(LABELS)}
@@ -14,27 +15,6 @@ def _fix_length(audio_1d: np.ndarray, target_len: int = 16000) -> np.ndarray:
     if a.shape[0] > target_len:
         return a[:target_len]
     return np.pad(a, (0, target_len - a.shape[0]), mode="constant")
-
-def waveform_to_logspec(waveform_1d: np.ndarray,
-                        frame_length: int = 512,
-                        frame_step: int = 128,
-                        fft_length: int = 512) -> np.ndarray:
-    """
-    waveform_1d: shape (16000,)
-    returns: log spectrogram, shape (time_frames, freq_bins)
-    """
-    w = tf.convert_to_tensor(waveform_1d, dtype=tf.float32)
-    stft = tf.signal.stft(
-        w,
-        frame_length=frame_length,
-        frame_step=frame_step,
-        fft_length=fft_length,
-        window_fn=tf.signal.hann_window,
-        pad_end=True
-    )  # (frames, fft_bins)
-    mag = tf.abs(stft)
-    logmag = tf.math.log(mag + 1e-6)
-    return logmag.numpy().astype(np.float32)
 
 def _passes_peak_filter(audio: np.ndarray, peak_limit: float = 0.5) -> bool:
     """

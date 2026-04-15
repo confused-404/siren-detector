@@ -1,6 +1,6 @@
-from middleman import training_data_from_manifest
-from training import find_epochs, train_model
-from create_model import NUM_CLASSES, create_spec_cnn_with_custom_dropouts
+from helpers.middleman import training_data_from_manifest
+from helpers.training import find_epochs, train_model
+from helpers.create_model import NUM_CLASSES, create_spec_cnn_with_custom_dropouts
 from sklearn.metrics import confusion_matrix, classification_report
 
 training_data = training_data_from_manifest(
