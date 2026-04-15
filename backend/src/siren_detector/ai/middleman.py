@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+from typing import List, Tuple
 
 LABELS = ["siren", "honk", "noise"]
 LABEL_TO_INDEX = {name: i for i, name in enumerate(LABELS)}
@@ -49,7 +50,7 @@ def _one_hot(label: str) -> np.ndarray:
     y[LABEL_TO_INDEX[label]] = 1.0
     return y
 
-def _split_stereo_to_examples(audio: np.ndarray, target_len: int = 16000) -> list[np.ndarray]:
+def _split_stereo_to_examples(audio: np.ndarray, target_len: int = 16000) -> List[np.ndarray]:
     """
     Takes stereo audio and returns [left_1d, right_1d] as separate examples.
     Supported shapes:
@@ -88,7 +89,7 @@ def load_manifest_dataset_channels_as_examples(
     seed: int = 1337,
     normalize: bool = False,
     peak_limit: float = 0.5,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Reads manifest and loads .npy stereo clips.
     For each clip, produces TWO training examples: left and right channel, same label.
@@ -175,5 +176,5 @@ def load_manifest_dataset_channels_as_examples(
     y_train = np.stack(y_list, axis=0).astype(np.float32)
     return x_train, y_train
 
-def training_data_from_manifest(**kwargs):
+def training_data_from_manifest(**kwargs) -> Tuple[np.ndarray, np.ndarray]:
     return load_manifest_dataset_channels_as_examples(**kwargs)

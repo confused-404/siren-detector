@@ -2,7 +2,7 @@ import os
 import time
 import threading
 from dataclasses import dataclass
-from typing import Optional, Dict
+from typing import Optional, Dict, Union
 import numpy as np
 import tensorflow as tf
 from siren_detector.ai.middleman import waveform_to_logspec
@@ -90,13 +90,13 @@ class LiveDetector:
 
         self._ema_probs = np.array([0.0, 0.0, 1.0], dtype=np.float32)
 
-        self._latest: Dict[str, object] = {"sound": "n", "direction": 0}
+        self._latest: Dict[str, Union[str, int]] = {"sound": "n", "direction": 0}
 
         self._audio_lock = threading.Lock()
         self._audio_buf = np.zeros((0, cfg.channels), dtype=np.float32)
         self._cap_thread: Optional[threading.Thread] = None
 
-    def _read_exact(self, pipe, nbytes: int) -> bytes:
+    def _read_exact(self, pipe: subprocess.PIPE, nbytes: int) -> bytes:
         out = bytearray()
         while len(out) < nbytes and self._running:
             chunk = pipe.read(nbytes - len(out))
@@ -105,7 +105,7 @@ class LiveDetector:
             out.extend(chunk)
         return bytes(out)
 
-    def start(self):
+    def start(self) -> None:
         print("DETECTOR: start() called")
         if self._running:
             return
@@ -117,18 +117,18 @@ class LiveDetector:
         self._thread = threading.Thread(target=self._infer_loop, daemon=True)
         self._thread.start()
 
-    def stop(self):
+    def stop(self) -> None:
         self._running = False
         if self._thread:
             self._thread.join(timeout=2)
         if self._cap_thread:
             self._cap_thread.join(timeout=2)
 
-    def get_status(self) -> Dict[str, object]:
+    def get_status(self) -> Dict[str, Union[str, int]]:
         with self._lock:
             return dict(self._latest)
 
-    def _capture_loop(self):
+    def _capture_loop(self) -> None:
         cfg = self.cfg
         block_len = int(cfg.sample_rate * cfg.block_seconds)
         hop_len = int(cfg.sample_rate * cfg.hop_seconds)
@@ -176,7 +176,7 @@ class LiveDetector:
             except Exception:
                 pass
 
-    def _infer_loop(self):
+    def _infer_loop(self) -> None:
         print("DETECTOR: infer loop running")
         cfg = self.cfg
         block_len = int(cfg.sample_rate * cfg.block_seconds)

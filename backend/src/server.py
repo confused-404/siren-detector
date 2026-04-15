@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from pathlib import Path
+from typing import Dict, Union
 from live_detector import LiveDetector, DetectorConfig
 
 app = FastAPI()
@@ -15,17 +15,17 @@ cfg = DetectorConfig(
 detector = LiveDetector(cfg)
 
 @app.on_event("startup")
-def startup():
+def startup() -> None:
     print("SERVER STARTUP: starting detector...")
     detector.start()
     print("SERVER STARTUP: detector.start() returned")
 
 @app.on_event("shutdown")
-def shutdown():
+def shutdown() -> None:
     detector.stop()
 
 @app.get("/api/status")
-def status():
+def status() -> Dict[str, Union[str, int]]:
     return detector.get_status()
 
 if not DIST_DIR.exists():

@@ -37,7 +37,7 @@ How it works:
   - It records exactly 1 second per label
 """
 
-def wait_for_quit(stop_event: threading.Event):
+def wait_for_quit(stop_event: threading.Event) -> None:
     while not stop_event.is_set():
         try:
             s = input().strip().lower()
@@ -48,7 +48,7 @@ def wait_for_quit(stop_event: threading.Event):
             stop_event.set()
             return
 
-def timestamp():
+def timestamp() -> str:
     return dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
 
 def record_1s_raw_int32_stereo() -> np.ndarray:
@@ -78,13 +78,13 @@ def record_1s_raw_int32_stereo() -> np.ndarray:
 def int32_to_float32_unit(x_int32: np.ndarray) -> np.ndarray:
     return x_int32.astype(np.float32) / 2147483648.0
 
-def shared_rms_normalize(x: np.ndarray, target_rms=0.08, max_gain=20.0, eps=1e-8) -> np.ndarray:
+def shared_rms_normalize(x: np.ndarray, target_rms: float = 0.08, max_gain: float = 20.0, eps: float = 1e-8) -> np.ndarray:
     rms = np.sqrt(np.mean(x[:, 0] ** 2 + x[:, 1] ** 2) / 2.0)
     gain = target_rms / max(rms, eps)
     gain = min(gain, max_gain)
     return np.clip(x * gain, -1.0, 1.0)
 
-def ensure_manifest(manifest_path: Path):
+def ensure_manifest(manifest_path: Path) -> None:
     if not manifest_path.exists():
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         with manifest_path.open("w", newline="") as f:
@@ -94,7 +94,7 @@ def ensure_manifest(manifest_path: Path):
                 "device", "rate", "channels", "normalized"
             ])
 
-def append_manifest(manifest_path: Path, file_path: Path, event: str, direction: str, normalized: bool):
+def append_manifest(manifest_path: Path, file_path: Path, event: str, direction: str, normalized: bool) -> None:
     with manifest_path.open("a", newline="") as f:
         w = csv.writer(f)
         w.writerow([
@@ -108,7 +108,7 @@ def append_manifest(manifest_path: Path, file_path: Path, event: str, direction:
             int(normalized),
         ])
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser(description="Record 1-second stereo clips labeled by event + direction.")
     p.add_argument("--out", default="dataset", help="Output directory")
     p.add_argument("--normalize", action="store_true", help="Shared RMS normalize (same gain both channels)")

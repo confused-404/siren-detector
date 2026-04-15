@@ -1,12 +1,13 @@
 from tensorflow import keras
 from tensorflow.keras import layers
+from typing import Tuple, Optional
 #note:6000 samples first
 
 INPUT_DIMENSION = 16000
 NUM_CLASSES = 3
 DROPOUT = 0.45 #0.3 OG
 
-def create_mlp_model(input_dimension, num_classes, dropout):
+def create_mlp_model(input_dimension: int, num_classes: int, dropout: float) -> keras.Model:
 
     model = keras.Sequential([
         keras.Input(shape=(input_dimension,)),
@@ -31,7 +32,7 @@ def create_mlp_model(input_dimension, num_classes, dropout):
 
     return model
 
-def create_spec_cnn(input_shape=(126, 257, 1), num_classes=3):
+def create_spec_cnn(input_shape: Tuple[int, int, int] = (126, 257, 1), num_classes: int = 3) -> keras.Model:
     model = keras.Sequential([
         keras.Input(shape=input_shape),
 
@@ -58,7 +59,7 @@ def create_spec_cnn(input_shape=(126, 257, 1), num_classes=3):
     )
     return model
 
-def create_spec_cnn_with_custom_dropouts(input_shape=(126, 257, 1), num_classes=3):
+def create_spec_cnn_with_custom_dropouts(input_shape: Tuple[int, int, int] = (126, 257, 1), num_classes: int = 3) -> keras.Model:
     def get_layer_dropout(layer: str) -> float:
         return float(input(f"Dropout for layer [{layer}]: "))
 
