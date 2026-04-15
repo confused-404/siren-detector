@@ -298,28 +298,9 @@ The processing window can be tuned via:
 - Reduce frontend polling frequency
 - Use TFLite model for lower precision/faster inference
 
-## Contributing
-
-To improve the detector:
-
-1. Record additional training samples using the dataset recording utility
-2. Retrain the model with expanded data
-3. Test directional accuracy by placing sound sources at known positions
-4. Optimize model architecture for your target hardware
-
-## License
-
-[Add license information]
-
 ## Acknowledgments
 
 - Audio feature extraction inspired by [librosa](https://librosa.org/) documentation
 - Direction estimation based on [GCC-PHAT](https://en.wikipedia.org/wiki/Generalized_cross-correlation) algorithm
-
-## Support & Contact
-
-For issues, questions, or contributions, please open an issue in the repository.
-
----
 
 **Note**: This system is designed to provide audio information that is not a substitute for visual attention while driving. Always obey traffic laws and remain alert to all road conditions.
