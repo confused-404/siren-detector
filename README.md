@@ -246,6 +246,7 @@ siren-detector/
     ├── scripts/                     # Training and model creation scripts
     │   ├── record_dataset.py       # Dataset recording utility
     │   ├── trainer.py              # Main training script
+    │   ├── utils.py                # Training utility functions
     │   └── helpers/                # Training helper modules
     │       ├── create_model.py     # Model architecture definitions
     │       ├── middleman.py        # Data loading and preprocessing
@@ -253,6 +254,7 @@ siren-detector/
     ├── src/
     │   ├── server.py               # FastAPI server
     │   ├── live_detector.py        # Real-time detection engine
+    │   ├── utils.py                # Runtime utility functions
     │   └── siren_detector/
     │       └── trained_car_alert_model.h5  # Pre-trained model
     └── tests/
