@@ -1,10 +1,10 @@
 from tensorflow import keras
 import numpy as np
 import pandas as pd
-
+from typing import Tuple
 # TODO: shuffle training data before input
 
-def find_epochs(model, training_data, version=-1, max_epochs=100, patience=3):
+def find_epochs(model: keras.Model, training_data: Tuple[np.ndarray, np.ndarray], version: int = -1, max_epochs: int = 100, patience: int = 3) -> int:
   """
   model: tensorflow H5 model object
   training_data: tuple of (input, output) from func format_training_data
@@ -42,7 +42,7 @@ def find_epochs(model, training_data, version=-1, max_epochs=100, patience=3):
   best_epoch = np.argmin(history.history['val_loss']) + 1
   return best_epoch
 
-def train_model(model, training_data, optimal_epochs):
+def train_model(model: keras.Model, training_data: Tuple[np.ndarray, np.ndarray], optimal_epochs: int) -> None:
   x_train, y_train = training_data
   model.fit(
     x_train, y_train,
