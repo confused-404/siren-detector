@@ -97,7 +97,7 @@ The model is exported as TensorFlow/TFLite for efficient inference on edge devic
 
 ### Prerequisites
 
-- Python 3.11 or higher
+- Python 3.11 (required for TFLite runtime compatibility)
 - Node.js 16+ (for frontend build)
 - Poetry (Python dependency manager)
 - Audio device support on target hardware
@@ -258,6 +258,17 @@ siren-detector/
 ```
 
 ## Raspberry Pi Setup (Auto-Boot)
+
+### System Prerequisites
+
+Before running the detector, install the required system packages for PyAudio:
+
+```bash
+sudo apt update
+sudo apt install portaudio19-dev python3-dev build-essential
+```
+
+### Automatic Startup
 
 To enable automatic startup on Raspberry Pi:
 
