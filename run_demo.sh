@@ -6,7 +6,7 @@ echo "Starting Siren Detector Demo..."
 REPO_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 APP_DIR="$REPO_DIR/app"
-BACKEND_DIR="$REPO_DIR/drupend"
+BACKEND_DIR="$REPO_DIR/backend"
 
 echo "Building frontend..."
 cd "$APP_DIR"

@@ -12,7 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DIST_DIR = REPO_ROOT / "app" / "dist"
 
 cfg = DetectorConfig(
-    model_path=str(REPO_ROOT / "drupend" / "src" / "siren_detector" / "ai" / "trained_car_alert_model.h5")
+    model_path=str(REPO_ROOT / "backend" / "src" / "siren_detector" / "ai" / "trained_car_alert_model.h5")
 )
 detector = LiveDetector(cfg)
 
