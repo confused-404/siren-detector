@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Optional, Dict, Union
 import numpy as np
 import tensorflow as tf
-from siren_detector.ai.middleman import waveform_to_logspec
+from utils import waveform_to_logspec
 import subprocess
 
 LABELS = ["siren", "honk", "noise"]
