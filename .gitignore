@@ -3,3 +3,4 @@ __pycache__/
 dist/
 *.h5
 *.keras
+.vscode/
