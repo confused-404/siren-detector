@@ -1,8 +1,9 @@
 import subprocess
 import threading
 import time
+import traceback
 from dataclasses import dataclass
-from typing import IO
+from typing import IO, Callable
 
 import numpy as np
 import tensorflow as tf
@@ -90,6 +91,7 @@ class LiveDetector:
         self._ema_probs = np.array([0.0, 0.0, 1.0], dtype=np.float32)
 
         self._latest: StatusResponse = {"sound": "n", "direction": 0}
+        self._failure: RuntimeError | None = None
 
         self._audio_lock = threading.Lock()
         self._audio_buf = np.zeros((0, cfg.channels), dtype=np.float32)
@@ -108,12 +110,17 @@ class LiveDetector:
         print("DETECTOR: start() called")
         if self._running:
             return
+        self._failure = None
         self._running = True
 
-        self._cap_thread = threading.Thread(target=self._capture_loop, daemon=True)
+        self._cap_thread = threading.Thread(
+            target=self._run_worker, args=("capture", self._capture_loop), daemon=True
+        )
         self._cap_thread.start()
 
-        self._thread = threading.Thread(target=self._infer_loop, daemon=True)
+        self._thread = threading.Thread(
+            target=self._run_worker, args=("infer", self._infer_loop), daemon=True
+        )
         self._thread.start()
 
     def stop(self) -> None:
@@ -124,8 +131,34 @@ class LiveDetector:
             self._cap_thread.join(timeout=2)
 
     def get_status(self) -> StatusResponse:
+        self.raise_if_unhealthy()
         with self._lock:
             return self._latest.copy()
+
+    def raise_if_unhealthy(self) -> None:
+        failure = self._failure
+        if failure is not None:
+            raise failure
+
+    def _run_worker(self, name: str, target: Callable[[], None]) -> None:
+        try:
+            target()
+            if self._running:
+                self._set_failure(
+                    RuntimeError(f"live detector {name} worker exited unexpectedly")
+                )
+        except Exception as exc:
+            details = traceback.format_exc()
+            self._set_failure(
+                RuntimeError(f"live detector {name} worker crashed: {exc}\n{details}")
+            )
+
+    def _set_failure(self, failure: RuntimeError) -> None:
+        if self._failure is not None:
+            return
+        self._failure = failure
+        self._running = False
+        print(f"DETECTOR: fatal failure: {failure}")
 
     def _capture_loop(self) -> None:
         cfg = self.cfg
