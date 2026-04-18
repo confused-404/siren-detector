@@ -26,12 +26,15 @@ if (!(app instanceof HTMLDivElement)) {
 }
 
 app.innerHTML = `
+  <div id="status-banner" class="status-banner" hidden></div>
   <div class="container">
     <div id="box--1" class="box">LEFT</div>
     <div id="box-0" class="box">CENTER</div>
     <div id="box-1" class="box">RIGHT</div>
   </div>
 `;
+
+const statusBanner = document.getElementById('status-banner');
 
 let step = 0;
 /** @type {StatusResponse[]} */
@@ -42,6 +45,45 @@ const testData = [
   { sound: 's', direction: 1 },
   { sound: 'h', direction: -1 },
 ];
+
+function resetDashboard() {
+  document.querySelectorAll('.box').forEach((el) => {
+    if (!(el instanceof HTMLElement)) {
+      return;
+    }
+
+    el.style.backgroundColor = 'white';
+    el.classList.remove('is-active', 'is-fault');
+  });
+}
+
+function setBanner(message) {
+  if (!(statusBanner instanceof HTMLDivElement)) {
+    return;
+  }
+
+  if (message) {
+    statusBanner.hidden = false;
+    statusBanner.textContent = message;
+    return;
+  }
+
+  statusBanner.hidden = true;
+  statusBanner.textContent = '';
+}
+
+function showDashboardFault(message) {
+  resetDashboard();
+  setBanner(message);
+
+  document.querySelectorAll('.box').forEach((el) => {
+    if (!(el instanceof HTMLElement)) {
+      return;
+    }
+
+    el.classList.add('is-fault');
+  });
+}
 
 async function updateDashboard() {
   /** @type {StatusResponse} */
@@ -58,19 +100,16 @@ async function updateDashboard() {
       }
       /** @type {StatusResponse} */
       data = await res.json();
-    } catch {
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Dashboard lost connection to the backend';
+      showDashboardFault(message);
       return;
     }
   }
 
-  document.querySelectorAll('.box').forEach((el) => {
-    if (!(el instanceof HTMLElement)) {
-      return;
-    }
-
-    el.style.backgroundColor = 'white';
-    el.classList.remove('is-active');
-  });
+  setBanner('');
+  resetDashboard();
 
   const activeBox = document.getElementById(`box-${data.direction}`);
   if (activeBox) {
@@ -83,4 +122,5 @@ async function updateDashboard() {
   }
 }
 
+updateDashboard();
 setInterval(updateDashboard, 1000);
