@@ -1,16 +1,31 @@
-import './style.css'
+// @ts-check
+import './style.css';
 
 // True -> test mode | False -> pi data collection
 const SIMULATE = false;
-const PI_URL = `${window.location.origin}/api/status`; 
+const PI_URL = `${window.location.origin}/api/status`;
 
 const MAPPING = {
   s: 'blue',
   h: 'yellow',
-  n: 'white'
+  n: 'white',
 };
 
-document.querySelector('#app').innerHTML = `
+/**
+ * @typedef {'s' | 'h' | 'n'} SoundCode
+ */
+
+/**
+ * @typedef {{ sound: SoundCode, direction: -1 | 0 | 1 }} StatusResponse
+ */
+
+const app = document.querySelector('#app');
+
+if (!(app instanceof HTMLDivElement)) {
+  throw new Error('Expected #app container to exist.');
+}
+
+app.innerHTML = `
   <div class="container">
     <div id="box--1" class="box">LEFT</div>
     <div id="box-0" class="box">CENTER</div>
@@ -19,15 +34,17 @@ document.querySelector('#app').innerHTML = `
 `;
 
 let step = 0;
+/** @type {StatusResponse[]} */
 const testData = [
   { sound: 's', direction: -1 },
   { sound: 'h', direction: 0 },
   { sound: 'n', direction: 1 },
   { sound: 's', direction: 1 },
-  { sound: 'h', direction: -1 }
+  { sound: 'h', direction: -1 },
 ];
 
 async function updateDashboard() {
+  /** @type {StatusResponse} */
   let data;
 
   if (SIMULATE) {
@@ -36,13 +53,21 @@ async function updateDashboard() {
   } else {
     try {
       const res = await fetch(PI_URL);
+      if (!res.ok) {
+        throw new Error(`Dashboard status request failed with ${res.status}`);
+      }
+      /** @type {StatusResponse} */
       data = await res.json();
-    } catch (err) {
+    } catch {
       return;
     }
   }
 
-  document.querySelectorAll('.box').forEach(el => {
+  document.querySelectorAll('.box').forEach((el) => {
+    if (!(el instanceof HTMLElement)) {
+      return;
+    }
+
     el.style.backgroundColor = 'white';
     el.classList.remove('is-active');
   });
@@ -51,9 +76,9 @@ async function updateDashboard() {
   if (activeBox) {
     const color = MAPPING[data.sound] || 'white';
     activeBox.style.backgroundColor = color;
-    
+
     if (color !== 'white') {
-        activeBox.classList.add('is-active');
+      activeBox.classList.add('is-active');
     }
   }
 }
