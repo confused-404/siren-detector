@@ -4,3 +4,6 @@ dist/
 *.h5
 *.keras
 .vscode/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
