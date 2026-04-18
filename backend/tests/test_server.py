@@ -5,6 +5,8 @@ import importlib
 import sys
 import types
 from pathlib import Path
+from typing import Any
+
 
 class _FakeStaticFiles:
     def __init__(self, *args, **kwargs) -> None:
@@ -12,6 +14,7 @@ class _FakeStaticFiles:
 
     async def __call__(self, scope, receive, send) -> None:
         del scope, receive, send
+
 
 class _FakeDetector:
     def __init__(self, cfg) -> None:
@@ -28,15 +31,17 @@ class _FakeDetector:
     def get_status(self) -> dict[str, int | str]:
         return {"sound": "h", "direction": -1}
 
+
 class _FakeDetectorConfig:
     def __init__(self, **kwargs) -> None:
         self.__dict__.update(kwargs)
+
 
 def test_server_status_and_lifecycle_use_detector(monkeypatch) -> None:
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "src"))
     monkeypatch.setattr("fastapi.staticfiles.StaticFiles", _FakeStaticFiles)
     monkeypatch.setattr("pathlib.Path.exists", lambda self: True)
-    fake_live_detector = types.ModuleType("live_detector")
+    fake_live_detector: Any = types.ModuleType("live_detector")
     fake_live_detector.LiveDetector = _FakeDetector
     fake_live_detector.DetectorConfig = _FakeDetectorConfig
     monkeypatch.setitem(sys.modules, "live_detector", fake_live_detector)

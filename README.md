@@ -159,6 +159,28 @@ poetry run pytest
 
 Tests live in `backend/tests/`.
 
+### Code Quality Checks
+
+The project includes baseline linting, formatting, and type-checking for both the backend and frontend.
+
+Backend:
+
+```bash
+cd backend
+poetry run ruff check src tests
+poetry run ruff format --check src tests
+poetry run mypy
+```
+
+Frontend:
+
+```bash
+cd app
+npm run lint
+npm run format
+npm run typecheck
+```
+
 ### Manual Frontend Development
 
 ```bash
