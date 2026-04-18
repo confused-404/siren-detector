@@ -148,6 +148,17 @@ cd backend
 poetry run uvicorn server:app --app-dir src --host 0.0.0.0 --port 3000
 ```
 
+### Backend Tests
+
+The backend includes a small `pytest` unit test suite for API lifecycle behavior, detector helpers, and spectrogram utilities.
+
+```bash
+cd backend
+poetry run pytest
+```
+
+Tests live in `backend/tests/`.
+
 ### Manual Frontend Development
 
 ```bash

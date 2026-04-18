@@ -20,7 +20,14 @@ dependencies = [
 ]
 
 [tool.poetry]
-packages = [{include = "siren_detector", from = "src"}]
+package-mode = false
+
+[tool.poetry.group.dev.dependencies]
+httpx = "^0.28.1"
+pytest = "^8.4.2"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

@@ -1,10 +1,11 @@
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Union
-from live_detector import LiveDetector, DetectorConfig
 
-app = FastAPI()
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+
+from live_detector import LiveDetector, DetectorConfig
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DIST_DIR = REPO_ROOT / "app" / "dist"
@@ -14,15 +15,17 @@ cfg = DetectorConfig(
 )
 detector = LiveDetector(cfg)
 
-@app.on_event("startup")
-def startup() -> None:
+@asynccontextmanager
+async def lifespan(_: FastAPI):
     print("SERVER STARTUP: starting detector...")
     detector.start()
     print("SERVER STARTUP: detector.start() returned")
+    try:
+        yield
+    finally:
+        detector.stop()
 
-@app.on_event("shutdown")
-def shutdown() -> None:
-    detector.stop()
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/api/status")
 def status() -> Dict[str, Union[str, int]]:
