@@ -1,7 +1,7 @@
+from helpers.create_model import NUM_CLASSES, create_spec_cnn_with_custom_dropouts
 from helpers.middleman import training_data_from_manifest
 from helpers.training import find_epochs, train_model
-from helpers.create_model import NUM_CLASSES, create_spec_cnn_with_custom_dropouts
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
 
 training_data = training_data_from_manifest(
@@ -39,9 +39,7 @@ print("train split:", x_train_split.shape, y_train_split.shape)
 print("validation split:", x_val.shape, y_val.shape)
 print("test split:", x_test.shape, y_test.shape)
 
-model = create_spec_cnn_with_custom_dropouts(
-    input_shape=x_train.shape[1:], num_classes=NUM_CLASSES
-)
+model = create_spec_cnn_with_custom_dropouts(input_shape=x_train.shape[1:], num_classes=NUM_CLASSES)
 
 best_epoch = find_epochs(
     model,
