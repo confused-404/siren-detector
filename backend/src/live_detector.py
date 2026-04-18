@@ -1,15 +1,18 @@
-import os
-import time
+import subprocess
 import threading
+import time
 from dataclasses import dataclass
-from typing import Optional, Dict, Union
+from typing import IO
+
 import numpy as np
 import tensorflow as tf
+
+from status_types import StatusResponse
 from utils import waveform_to_logspec
-import subprocess
 
 LABELS = ["siren", "honk", "noise"]
 LABEL_TO_CHAR = {"siren": "s", "honk": "h", "noise": "n"}
+
 
 @dataclass
 class DetectorConfig:
@@ -24,20 +27,20 @@ class DetectorConfig:
     frame_step: int = 128
     fft_length: int = 512
 
-    mic_distance_m: float = 0.1 # TODO: measure and edit
+    mic_distance_m: float = 0.1  # TODO: measure and edit
     speed_of_sound: float = 343.0
     direction_deadband_deg: float = 10.0
 
     smooth_alpha: float = 0.6
 
-    device: Optional[int] = None
-    
+    device: int | None = None
+
     arecord_device: str = "plughw:2,0"
     arecord_format: str = "S32_LE"
 
 def gcc_phat_tdoa(x: np.ndarray, y: np.ndarray, fs: int) -> float:
     """
-    Use GCC_PHAT to estimate time delays
+    Estimate relative arrival delay with the GCC-PHAT method.
     """
     n = 1
     L = len(x) + len(y)
@@ -53,7 +56,7 @@ def gcc_phat_tdoa(x: np.ndarray, y: np.ndarray, fs: int) -> float:
     R /= denom
 
     cc = np.fft.irfft(R, n=n)
-    cc = np.concatenate((cc[-(n//2):], cc[:(n//2)]))
+    cc = np.concatenate((cc[-(n // 2) :], cc[: (n // 2)]))
 
     max_shift = int(n // 2)
     shift = np.argmax(cc) - max_shift
@@ -65,10 +68,6 @@ def tau_to_direction(tau: float, cfg: DetectorConfig) -> int:
     """
     Convert time delay to left/center/right.
     Approximate angle using sin(theta)=tau*c/d. Clamp to [-1,1].
-    Convention:
-      - If tau > 0 => left channel leads right => sound from LEFT => direction = -1
-      - If tau < 0 => right leads left => sound from RIGHT => direction = +1
-    nevermind doesn't work let's just flip
     """
     s = (tau * cfg.speed_of_sound) / max(cfg.mic_distance_m, 1e-6)
     s = float(np.clip(s, -1.0, 1.0))
@@ -86,17 +85,17 @@ class LiveDetector:
 
         self._lock = threading.Lock()
         self._running = False
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
 
         self._ema_probs = np.array([0.0, 0.0, 1.0], dtype=np.float32)
 
-        self._latest: Dict[str, Union[str, int]] = {"sound": "n", "direction": 0}
+        self._latest: StatusResponse = {"sound": "n", "direction": 0}
 
         self._audio_lock = threading.Lock()
         self._audio_buf = np.zeros((0, cfg.channels), dtype=np.float32)
-        self._cap_thread: Optional[threading.Thread] = None
+        self._cap_thread: threading.Thread | None = None
 
-    def _read_exact(self, pipe: subprocess.PIPE, nbytes: int) -> bytes:
+    def _read_exact(self, pipe: IO[bytes], nbytes: int) -> bytes:
         out = bytearray()
         while len(out) < nbytes and self._running:
             chunk = pipe.read(nbytes - len(out))
@@ -124,9 +123,9 @@ class LiveDetector:
         if self._cap_thread:
             self._cap_thread.join(timeout=2)
 
-    def get_status(self) -> Dict[str, Union[str, int]]:
+    def get_status(self) -> StatusResponse:
         with self._lock:
-            return dict(self._latest)
+            return self._latest.copy()
 
     def _capture_loop(self) -> None:
         cfg = self.cfg
@@ -138,11 +137,16 @@ class LiveDetector:
 
         cmd = [
             "arecord",
-            "-D", cfg.arecord_device,
-            "-f", cfg.arecord_format,
-            "-r", str(cfg.sample_rate),
-            "-c", str(cfg.channels),
-            "-t", "raw",
+            "-D",
+            cfg.arecord_device,
+            "-f",
+            cfg.arecord_format,
+            "-r",
+            str(cfg.sample_rate),
+            "-c",
+            str(cfg.channels),
+            "-t",
+            "raw",
             "--buffer-size=262144",
             "--period-size=32768",
             "-q",
@@ -205,12 +209,16 @@ class LiveDetector:
             spec_l = standardize(spec_l)
             spec_r = standardize(spec_r)
 
-            X = np.stack([spec_l[..., np.newaxis], spec_r[..., np.newaxis]], axis=0).astype(np.float32)
+            X = np.stack([spec_l[..., np.newaxis], spec_r[..., np.newaxis]], axis=0).astype(
+                np.float32
+            )
 
             probs = self.model.predict(X, verbose=0)
             probs_mean = probs.mean(axis=0).astype(np.float32)
 
-            self._ema_probs = cfg.smooth_alpha * self._ema_probs + (1.0 - cfg.smooth_alpha) * probs_mean
+            self._ema_probs = (
+                cfg.smooth_alpha * self._ema_probs + (1.0 - cfg.smooth_alpha) * probs_mean
+            )
 
             idx = int(np.argmax(self._ema_probs))
             label = LABELS[idx]
@@ -218,6 +226,6 @@ class LiveDetector:
             tau = gcc_phat_tdoa(left, right, cfg.sample_rate)
             direction = tau_to_direction(tau, cfg) if label != "noise" else 0
 
-            status = {"sound": LABEL_TO_CHAR[label], "direction": int(direction)}
+            status: StatusResponse = {"sound": LABEL_TO_CHAR[label], "direction": int(direction)}
             with self._lock:
                 self._latest = status
