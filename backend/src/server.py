@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi import HTTPException
 from fastapi.staticfiles import StaticFiles
 
 from live_detector import DetectorConfig, LiveDetector
@@ -35,7 +36,10 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/api/status")
 def status() -> StatusResponse:
-    return detector.get_status()
+    try:
+        return detector.get_status()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 if not DIST_DIR.exists():
