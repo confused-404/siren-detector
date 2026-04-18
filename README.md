@@ -200,15 +200,13 @@ Returns the current detection status.
 ```json
 {
   "sound": "s|h|n",
-  "direction": -1|0|1,
-  "confidence": 0.0-1.0
+  "direction": -1|0|1
 }
 ```
 
 Where:
 - `sound`: Sound type ("s" = siren, "h" = honk, "n" = noise)
 - `direction`: Direction indicator (-1 = left, 0 = center, +1 = right)
-- `confidence`: Model confidence score for the detected class
 
 ## Configuration
 
