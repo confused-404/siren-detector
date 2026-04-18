@@ -2,8 +2,9 @@ import subprocess
 import threading
 import time
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import IO, Callable
+from typing import IO
 
 import numpy as np
 import tensorflow as tf
@@ -38,6 +39,7 @@ class DetectorConfig:
 
     arecord_device: str = "plughw:2,0"
     arecord_format: str = "S32_LE"
+
 
 def gcc_phat_tdoa(x: np.ndarray, y: np.ndarray, fs: int) -> float:
     """
@@ -144,9 +146,7 @@ class LiveDetector:
         try:
             target()
             if self._running:
-                self._set_failure(
-                    RuntimeError(f"live detector {name} worker exited unexpectedly")
-                )
+                self._set_failure(RuntimeError(f"live detector {name} worker exited unexpectedly"))
         except Exception as exc:
             details = traceback.format_exc()
             self._set_failure(

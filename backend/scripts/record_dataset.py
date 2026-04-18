@@ -3,9 +3,10 @@ import csv
 import datetime as dt
 import subprocess
 import sys
-from pathlib import Path
-import numpy as np
 import threading
+from pathlib import Path
+
+import numpy as np
 
 ARECORD_DEVICE = "plughw:2,0"
 RATE = 16000
@@ -21,7 +22,7 @@ COMMANDS = {
     "hl": ("honk", "left"),
     "hc": ("honk", "center"),
     "hr": ("honk", "right"),
-    "n":  ("noise", "none"),
+    "n": ("noise", "none"),
 }
 
 HELP_TEXT = """Interactive labeling:
@@ -37,6 +38,7 @@ How it works:
   - It records exactly 1 second per label
 """
 
+
 def wait_for_quit(stop_event: threading.Event) -> None:
     while not stop_event.is_set():
         try:
@@ -48,19 +50,27 @@ def wait_for_quit(stop_event: threading.Event) -> None:
             stop_event.set()
             return
 
+
 def timestamp() -> str:
     return dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+
 
 def record_1s_raw_int32_stereo() -> np.ndarray:
     """Returns int32 array shape (RATE, 2)"""
     cmd = [
         "arecord",
-        "-D", ARECORD_DEVICE,
-        "-f", FORMAT,
-        "-r", str(RATE),
-        "-c", str(CHANNELS),
-        "-d", str(DURATION_S),
-        "-t", "raw",
+        "-D",
+        ARECORD_DEVICE,
+        "-f",
+        FORMAT,
+        "-r",
+        str(RATE),
+        "-c",
+        str(CHANNELS),
+        "-d",
+        str(DURATION_S),
+        "-t",
+        "raw",
         "-q",
     ]
     try:
@@ -75,45 +85,72 @@ def record_1s_raw_int32_stereo() -> np.ndarray:
         raise RuntimeError(f"Expected {expected} samples, got {x.size}.")
     return x.reshape(-1, CHANNELS)  # (16000, 2)
 
+
 def int32_to_float32_unit(x_int32: np.ndarray) -> np.ndarray:
     return x_int32.astype(np.float32) / 2147483648.0
 
-def shared_rms_normalize(x: np.ndarray, target_rms: float = 0.08, max_gain: float = 20.0, eps: float = 1e-8) -> np.ndarray:
+
+def shared_rms_normalize(
+    x: np.ndarray,
+    target_rms: float = 0.08,
+    max_gain: float = 20.0,
+    eps: float = 1e-8,
+) -> np.ndarray:
     rms = np.sqrt(np.mean(x[:, 0] ** 2 + x[:, 1] ** 2) / 2.0)
     gain = target_rms / max(rms, eps)
     gain = min(gain, max_gain)
     return np.clip(x * gain, -1.0, 1.0)
+
 
 def ensure_manifest(manifest_path: Path) -> None:
     if not manifest_path.exists():
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         with manifest_path.open("w", newline="") as f:
             w = csv.writer(f)
-            w.writerow([
-                "file", "event", "direction", "ts",
-                "device", "rate", "channels", "normalized"
-            ])
+            w.writerow(
+                ["file", "event", "direction", "ts", "device", "rate", "channels", "normalized"]
+            )
 
-def append_manifest(manifest_path: Path, file_path: Path, event: str, direction: str, normalized: bool) -> None:
+
+def append_manifest(
+    manifest_path: Path,
+    file_path: Path,
+    event: str,
+    direction: str,
+    normalized: bool,
+) -> None:
     with manifest_path.open("a", newline="") as f:
         w = csv.writer(f)
-        w.writerow([
-            str(file_path),
-            event,
-            direction,
-            dt.datetime.now().isoformat(timespec="seconds"),
-            ARECORD_DEVICE,
-            RATE,
-            CHANNELS,
-            int(normalized),
-        ])
+        w.writerow(
+            [
+                str(file_path),
+                event,
+                direction,
+                dt.datetime.now().isoformat(timespec="seconds"),
+                ARECORD_DEVICE,
+                RATE,
+                CHANNELS,
+                int(normalized),
+            ]
+        )
+
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Record 1-second stereo clips labeled by event + direction.")
+    p = argparse.ArgumentParser(
+        description="Record 1-second stereo clips labeled by event + direction."
+    )
     p.add_argument("--out", default="dataset", help="Output directory")
-    p.add_argument("--normalize", action="store_true", help="Shared RMS normalize (same gain both channels)")
+    p.add_argument(
+        "--normalize",
+        action="store_true",
+        help="Shared RMS normalize (same gain both channels)",
+    )
     p.add_argument("--count", type=int, default=0, help="Stop after N clips (0 = until quit)")
-    p.add_argument("--label", default=None, help="Continuous mode label key (sl/sc/sr/hl/hc/hr/n). Type 'q' + Enter to stop.")
+    p.add_argument(
+        "--label",
+        default=None,
+        help="Continuous mode label key (sl/sc/sr/hl/hc/hr/n). Type 'q' + Enter to stop.",
+    )
     args = p.parse_args()
 
     out_root = Path(args.out)
@@ -135,7 +172,10 @@ def main() -> None:
         event, direction = COMMANDS[key]
         print(f"Continuous mode: recording '{event}_{direction}' once per second.")
         print("Type 'q' then Enter to stop.\n")
-        print("(Start your sound, then press Enter here if you want; it will keep recording regardless.)")
+        print(
+            "(Start your sound, then press Enter here if you want; "
+            "it will keep recording regardless.)"
+        )
 
         stop_event = threading.Event()
         t = threading.Thread(target=wait_for_quit, args=(stop_event,), daemon=True)
@@ -203,6 +243,7 @@ def main() -> None:
 
     print(f"Done. Total clips saved: {saved}")
     print(f"Manifest: {manifest}")
+
 
 if __name__ == "__main__":
     main()

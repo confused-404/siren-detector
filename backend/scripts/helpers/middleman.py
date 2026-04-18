@@ -1,12 +1,12 @@
 import os
+
 import numpy as np
 import pandas as pd
-import tensorflow as tf
-from typing import List, Tuple
-from helpers.utils import waveform_to_logspec 
+from helpers.utils import waveform_to_logspec
 
 LABELS = ["siren", "honk", "noise"]
 LABEL_TO_INDEX = {name: i for i, name in enumerate(LABELS)}
+
 
 def _fix_length(audio_1d: np.ndarray, target_len: int = 16000) -> np.ndarray:
     a = np.asarray(audio_1d).astype(np.float32).reshape(-1)
@@ -16,11 +16,13 @@ def _fix_length(audio_1d: np.ndarray, target_len: int = 16000) -> np.ndarray:
         return a[:target_len]
     return np.pad(a, (0, target_len - a.shape[0]), mode="constant")
 
+
 def _passes_peak_filter(audio: np.ndarray, peak_limit: float = 0.5) -> bool:
     """
     Returns True if the clip peak is within the allowed range.
     """
     return np.max(np.abs(audio)) < peak_limit
+
 
 def _one_hot(label: str) -> np.ndarray:
     label = label.strip().lower()
@@ -30,7 +32,8 @@ def _one_hot(label: str) -> np.ndarray:
     y[LABEL_TO_INDEX[label]] = 1.0
     return y
 
-def _split_stereo_to_examples(audio: np.ndarray, target_len: int = 16000) -> List[np.ndarray]:
+
+def _split_stereo_to_examples(audio: np.ndarray, target_len: int = 16000) -> list[np.ndarray]:
     """
     Takes stereo audio and returns [left_1d, right_1d] as separate examples.
     Supported shapes:
@@ -61,6 +64,7 @@ def _split_stereo_to_examples(audio: np.ndarray, target_len: int = 16000) -> Lis
     # ambiguous
     raise ValueError(f"Ambiguous stereo shape {a.shape}; can't infer channel axis.")
 
+
 def load_manifest_dataset_channels_as_examples(
     dataset_dir: str = "3_2_test_dataset",
     manifest_name: str = "manifest.csv",
@@ -69,7 +73,7 @@ def load_manifest_dataset_channels_as_examples(
     seed: int = 1337,
     normalize: bool = False,
     peak_limit: float = 0.5,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Reads manifest and loads .npy stereo clips.
     For each clip, produces TWO training examples: left and right channel, same label.
@@ -156,5 +160,6 @@ def load_manifest_dataset_channels_as_examples(
     y_train = np.stack(y_list, axis=0).astype(np.float32)
     return x_train, y_train
 
-def training_data_from_manifest(**kwargs) -> Tuple[np.ndarray, np.ndarray]:
+
+def training_data_from_manifest(**kwargs) -> tuple[np.ndarray, np.ndarray]:
     return load_manifest_dataset_channels_as_examples(**kwargs)
