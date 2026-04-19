@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import io
+import subprocess
+import threading
+from typing import cast
 
 import numpy as np
 import pytest
@@ -19,6 +22,9 @@ def _make_detector() -> LiveDetector:
     detector.cfg = DetectorConfig()
     detector.model = _FakeModel()
     detector._running = False
+    detector._failure = None
+    detector._capture_proc = None
+    detector._capture_proc_lock = threading.Lock()
     return detector
 
 
@@ -63,3 +69,57 @@ def test_read_exact_returns_empty_bytes_when_stream_ends_early() -> None:
     data = io.BytesIO(b"ab")
 
     assert detector._read_exact(data, 4) == b""
+
+
+class _FakeStdout:
+    def __init__(self) -> None:
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _FakeProc:
+    def __init__(self) -> None:
+        self.stdout = _FakeStdout()
+        self.terminated = False
+        self.killed = False
+        self.wait_called = False
+
+    def terminate(self) -> None:
+        self.terminated = True
+
+    def wait(self, timeout: float) -> None:
+        del timeout
+        self.wait_called = True
+
+    def kill(self) -> None:
+        self.killed = True
+
+
+def test_stop_capture_process_terminates_arecord_and_clears_reference() -> None:
+    detector = _make_detector()
+    proc = _FakeProc()
+    detector._capture_proc = cast(subprocess.Popen[bytes], proc)
+
+    detector._stop_capture_process()
+
+    assert proc.stdout.closed is True
+    assert proc.terminated is True
+    assert proc.wait_called is True
+    assert proc.killed is False
+    assert detector._capture_proc is None
+
+
+def test_set_failure_stops_capture_process() -> None:
+    detector = _make_detector()
+    proc = _FakeProc()
+    detector._capture_proc = cast(subprocess.Popen[bytes], proc)
+    detector._running = True
+
+    detector._set_failure(RuntimeError("boom"))
+
+    assert detector._running is False
+    assert detector._failure is not None
+    assert proc.terminated is True
+    assert detector._capture_proc is None

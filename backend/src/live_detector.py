@@ -98,6 +98,8 @@ class LiveDetector:
         self._audio_lock = threading.Lock()
         self._audio_buf = np.zeros((0, cfg.channels), dtype=np.float32)
         self._cap_thread: threading.Thread | None = None
+        self._capture_proc: subprocess.Popen[bytes] | None = None
+        self._capture_proc_lock = threading.Lock()
 
     def _read_exact(self, pipe: IO[bytes], nbytes: int) -> bytes:
         out = bytearray()
@@ -127,6 +129,7 @@ class LiveDetector:
 
     def stop(self) -> None:
         self._running = False
+        self._stop_capture_process()
         if self._thread:
             self._thread.join(timeout=2)
         if self._cap_thread:
@@ -158,7 +161,46 @@ class LiveDetector:
             return
         self._failure = failure
         self._running = False
+        self._stop_capture_process()
         print(f"DETECTOR: fatal failure: {failure}")
+
+    def _start_capture_process(self, cmd: list[str]) -> subprocess.Popen[bytes]:
+        proc: subprocess.Popen[bytes] = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        with self._capture_proc_lock:
+            self._capture_proc = proc
+        return proc
+
+    def _clear_capture_process(self, proc: subprocess.Popen[bytes]) -> None:
+        with self._capture_proc_lock:
+            if self._capture_proc is proc:
+                self._capture_proc = None
+
+    def _stop_capture_process(self) -> None:
+        with self._capture_proc_lock:
+            proc = self._capture_proc
+            self._capture_proc = None
+
+        if proc is None:
+            return
+
+        try:
+            if proc.stdout is not None:
+                proc.stdout.close()
+        except Exception:
+            pass
+
+        try:
+            proc.terminate()
+            proc.wait(timeout=1)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
 
     def _capture_loop(self) -> None:
         cfg = self.cfg
@@ -186,13 +228,14 @@ class LiveDetector:
         ]
 
         print("DETECTOR: capture loop starting arecord...")
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        proc = self._start_capture_process(cmd)
 
         try:
             while self._running:
                 if proc.poll() is not None:
                     print("DETECTOR: arecord died, restarting...")
-                    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                    self._clear_capture_process(proc)
+                    proc = self._start_capture_process(cmd)
 
                 assert proc.stdout is not None
                 raw = self._read_exact(proc.stdout, frame_bytes)
@@ -208,10 +251,8 @@ class LiveDetector:
                     if self._audio_buf.shape[0] > block_len:
                         self._audio_buf = self._audio_buf[-block_len:, :]
         finally:
-            try:
-                proc.kill()
-            except Exception:
-                pass
+            self._clear_capture_process(proc)
+            self._stop_capture_process()
 
     def _infer_loop(self) -> None:
         print("DETECTOR: infer loop running")
