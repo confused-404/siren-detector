@@ -73,14 +73,15 @@ def load_manifest_dataset_channels_as_examples(
     seed: int = 1337,
     normalize: bool = False,
     peak_limit: float = 0.5,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Reads manifest and loads .npy stereo clips.
     For each clip, produces TWO training examples: left and right channel, same label.
 
     Returns:
-      x_train: (N*2, target_len)
+      x_train: (N*2, time_frames, freq_bins, 1)
       y_train: (N*2, 3)
+      group_ids: (N*2,) clip identifiers for grouped splitting
     """
     manifest_path = os.path.join(dataset_dir, manifest_name)
     if not os.path.exists(manifest_path):
@@ -115,6 +116,7 @@ def load_manifest_dataset_channels_as_examples(
 
     x_list = []
     y_list = []
+    group_ids = []
 
     kept = 0
     dropped = 0
@@ -151,6 +153,7 @@ def load_manifest_dataset_channels_as_examples(
             spec = (spec - spec.mean()) / (spec.std() + 1e-6)
             x_list.append(spec)
             y_list.append(y)
+            group_ids.append(npy_path)
 
     print(f"Kept {kept} channel examples")
     print(f"Dropped {dropped} channel examples above {peak_limit}")
@@ -158,8 +161,9 @@ def load_manifest_dataset_channels_as_examples(
     x_train = np.stack(x_list, axis=0).astype(np.float32)
     x_train = x_train[..., np.newaxis]
     y_train = np.stack(y_list, axis=0).astype(np.float32)
-    return x_train, y_train
+    groups = np.asarray(group_ids, dtype=str)
+    return x_train, y_train, groups
 
 
-def training_data_from_manifest(**kwargs) -> tuple[np.ndarray, np.ndarray]:
+def training_data_from_manifest(**kwargs) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return load_manifest_dataset_channels_as_examples(**kwargs)
