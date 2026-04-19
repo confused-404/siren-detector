@@ -57,6 +57,9 @@ function resetDashboard() {
   });
 }
 
+/**
+ * @param {string} message
+ */
 function setBanner(message) {
   if (!(statusBanner instanceof HTMLDivElement)) {
     return;
@@ -72,6 +75,9 @@ function setBanner(message) {
   statusBanner.textContent = '';
 }
 
+/**
+ * @param {string} message
+ */
 function showDashboardFault(message) {
   resetDashboard();
   setBanner(message);
