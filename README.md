@@ -148,6 +148,16 @@ cd backend
 poetry run uvicorn server:app --app-dir src --host 0.0.0.0 --port 3000
 ```
 
+If trained model lives outside the repository, set `SIREN_MODEL_PATH` before starting the backend:
+
+```bash
+cd backend
+SIREN_MODEL_PATH=/absolute/path/to/trained_car_alert_model.h5 \
+poetry run uvicorn server:app --app-dir src --host 0.0.0.0 --port 3000
+```
+
+When the model is missing or invalid, the server stays up and `GET /api/status` returns `503` with a detector error.
+
 ### Backend Tests
 
 The backend includes a small `pytest` unit test suite for API lifecycle behavior, detector helpers, and spectrogram utilities.
