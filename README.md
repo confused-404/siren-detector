@@ -84,9 +84,7 @@ The model is exported as TensorFlow/TFLite for efficient inference on edge devic
 - **Python 3.11+**
 - **FastAPI** - Web framework for API
 - **TensorFlow/TFLite** - Deep learning inference
-- **librosa** - Audio processing utilities
 - **NumPy/Pandas** - Numerical computing
-- **PyAudio/sounddevice** - Audio device interface
 
 ### Frontend
 - **Vanilla JavaScript** - No framework dependencies
@@ -303,15 +301,6 @@ siren-detector/
 
 ## Raspberry Pi Setup (Auto-Boot)
 
-### System Prerequisites
-
-Before running the detector, install the required system packages for PyAudio:
-
-```bash
-sudo apt update
-sudo apt install portaudio19-dev python3-dev build-essential
-```
-
 ### Automatic Startup
 
 To enable automatic startup on Raspberry Pi:
@@ -344,7 +333,7 @@ The processing window can be tuned via:
 
 ## Acknowledgments
 
-- Audio feature extraction inspired by [librosa](https://librosa.org/) documentation
-- Direction estimation based on [GCC-PHAT](https://en.wikipedia.org/wiki/Generalized_cross-correlation) algorithm
+- Audio recording using [arecord](https://linux.die.net/man/1/arecord)
+- Direction estimation based on [GCC-PHAT](https://dsp.stackexchange.com/questions/74574/understanding-gcc-phat-as-a-feature) algorithm
 
 **Note**: This system is designed to provide audio information that is not a substitute for visual attention while driving. Always obey traffic laws and remain alert to all road conditions.
