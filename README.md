@@ -114,6 +114,11 @@ The model is exported as TensorFlow/TFLite for efficient inference on edge devic
    poetry install
    ```
 
+   For training support, install the optional training group:
+   ```bash
+   poetry install --with training
+   ```
+
 3. **Frontend setup**
    ```bash
    cd ../app
@@ -150,7 +155,7 @@ If trained model lives outside the repository, set `SIREN_MODEL_PATH` before sta
 
 ```bash
 cd backend
-SIREN_MODEL_PATH=/absolute/path/to/trained_car_alert_model.h5 \
+SIREN_MODEL_PATH=/absolute/path/to/trained_car_alert_model.tflite \
 poetry run uvicorn server:app --app-dir src --host 0.0.0.0 --port 3000
 ```
 
@@ -166,6 +171,7 @@ poetry run pytest
 ```
 
 Tests live in `backend/tests/`.
+Training-related tests are skipped unless the optional `training` group is installed.
 
 ### Code Quality Checks
 
@@ -250,11 +256,18 @@ To retrain the model with custom data:
    poetry run python trainer.py
    ```
 
+   Install the optional training dependencies first if you have not already:
+   ```bash
+   cd backend
+   poetry install --with training
+   ```
+
 The trainer will:
 - Load log-spectrograms from your dataset
 - Train the CNN model with early stopping
 - Evaluate confusion matrix and classification metrics
-- Save the model as `trained_car_alert_model.h5`
+- Save the training model as `trained_car_alert_model.h5`
+- Export a deployment model as `trained_car_alert_model.tflite`
 
 ## Dashboard
 
@@ -295,7 +308,7 @@ siren-detector/
     │   ├── live_detector.py        # Real-time detection engine
     │   ├── utils.py                # Runtime utility functions
     │   └── siren_detector/
-    │       └── trained_car_alert_model.h5  # Pre-trained model
+    │       └── trained_car_alert_model.tflite  # Deployment model
     └── tests/
 ```
 
@@ -322,7 +335,7 @@ Update `arecord_device` in `DetectorConfig` to match your hardware.
 
 ### Model Not Loading
 
-Ensure the model file exists at the path specified in `DetectorConfig.model_path`. Verify model is a valid `.h5` file compatible with your TensorFlow version.
+Ensure the model file exists at the path specified in `DetectorConfig.model_path`. Verify model is a valid `.tflite` file compatible with `tflite-runtime`.
 
 ### High CPU Usage
 

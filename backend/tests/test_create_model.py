@@ -3,9 +3,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
+
+pytest.importorskip("tensorflow")
 
 from helpers.create_model import SpecCnnDropoutConfig, create_spec_cnn_with_custom_dropouts
 

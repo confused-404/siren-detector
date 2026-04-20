@@ -4,10 +4,10 @@ import time
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import IO
+from typing import IO, Any, Protocol, cast
 
 import numpy as np
-import tensorflow as tf
+from tflite_runtime.interpreter import Interpreter
 
 from status_types import StatusResponse
 from utils import waveform_to_logspec
@@ -18,7 +18,7 @@ LABEL_TO_CHAR = {"siren": "s", "honk": "h", "noise": "n"}
 
 @dataclass
 class DetectorConfig:
-    model_path: str = "siren_detector/ai/trained_car_alert_model.h5"
+    model_path: str = "siren_detector/ai/trained_car_alert_model.tflite"
     sample_rate: int = 16000
     channels: int = 2
     block_seconds: float = 1.0
@@ -39,6 +39,70 @@ class DetectorConfig:
 
     arecord_device: str = "plughw:2,0"
     arecord_format: str = "S32_LE"
+
+
+class InferenceModel(Protocol):
+    def predict(self, batch: np.ndarray) -> np.ndarray: ...
+
+
+class TFLiteModelRunner:
+    def __init__(self, model_path: str):
+        self._interpreter = Interpreter(model_path=model_path)
+        self._interpreter.allocate_tensors()
+        self._input_detail: dict[str, Any] = self._interpreter.get_input_details()[0]
+        self._output_detail: dict[str, Any] = self._interpreter.get_output_details()[0]
+
+    def _resize_input_if_needed(self, shape: tuple[int, ...]) -> None:
+        current_shape = tuple(int(dim) for dim in self._input_detail["shape"])
+        if current_shape == shape:
+            return
+
+        self._interpreter.resize_tensor_input(self._input_detail["index"], shape, strict=False)
+        self._interpreter.allocate_tensors()
+        self._input_detail = self._interpreter.get_input_details()[0]
+        self._output_detail = self._interpreter.get_output_details()[0]
+
+    @staticmethod
+    def _quantize_input(values: np.ndarray, detail: dict[str, object]) -> np.ndarray:
+        dtype = np.dtype(cast(Any, detail["dtype"]))
+        if np.issubdtype(dtype, np.floating):
+            return values.astype(dtype, copy=False)
+
+        scale, zero_point = cast(tuple[float, int], detail["quantization"])
+        if scale == 0:
+            raise ValueError("TFLite model input has invalid quantization scale 0")
+
+        quantized = np.round(values / scale + zero_point)
+        limits = np.iinfo(dtype)
+        return np.clip(quantized, limits.min, limits.max).astype(dtype)
+
+    @staticmethod
+    def _dequantize_output(values: np.ndarray, detail: dict[str, object]) -> np.ndarray:
+        dtype = np.dtype(cast(Any, detail["dtype"]))
+        if np.issubdtype(dtype, np.floating):
+            return values.astype(np.float32, copy=False)
+
+        scale, zero_point = cast(tuple[float, int], detail["quantization"])
+        if scale == 0:
+            raise ValueError("TFLite model output has invalid quantization scale 0")
+
+        return (values.astype(np.float32) - zero_point) * scale
+
+    def predict(self, batch: np.ndarray) -> np.ndarray:
+        outputs: list[np.ndarray] = []
+
+        for sample in np.asarray(batch, dtype=np.float32):
+            sample_batch = np.expand_dims(sample, axis=0)
+            self._resize_input_if_needed(sample_batch.shape)
+
+            input_tensor = self._quantize_input(sample_batch, self._input_detail)
+            self._interpreter.set_tensor(self._input_detail["index"], input_tensor)
+            self._interpreter.invoke()
+
+            output_tensor = self._interpreter.get_tensor(self._output_detail["index"])
+            outputs.append(self._dequantize_output(output_tensor, self._output_detail)[0])
+
+        return np.stack(outputs, axis=0)
 
 
 def gcc_phat_tdoa(x: np.ndarray, y: np.ndarray, fs: int) -> float:
@@ -84,7 +148,7 @@ def tau_to_direction(tau: float, cfg: DetectorConfig) -> int:
 class LiveDetector:
     def __init__(self, cfg: DetectorConfig):
         self.cfg = cfg
-        self.model = tf.keras.models.load_model(cfg.model_path, compile=False)
+        self.model: InferenceModel = TFLiteModelRunner(cfg.model_path)
 
         self._lock = threading.Lock()
         self._running = False
@@ -287,7 +351,7 @@ class LiveDetector:
                 np.float32
             )
 
-            probs = self.model.predict(X, verbose=0)
+            probs = self.model.predict(X)
             probs_mean = probs.mean(axis=0).astype(np.float32)
 
             self._ema_probs = (

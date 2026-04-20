@@ -89,6 +89,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--history-version", type=int, default=0)
     parser.add_argument("--output-model", default="trained_car_alert_model.h5")
+    parser.add_argument("--output-tflite", default="trained_car_alert_model.tflite")
     parser.add_argument("--dropout-conv1", type=float, default=0.2)
     parser.add_argument("--dropout-conv2", type=float, default=0.25)
     parser.add_argument("--dropout-conv3", type=float, default=0.3)
@@ -158,6 +159,12 @@ def main() -> None:
 
     final_model.save(args.output_model)
     print(f"Saved {args.output_model}")
+
+    converter = tf.lite.TFLiteConverter.from_keras_model(final_model)
+    tflite_model = converter.convert()
+    with open(args.output_tflite, "wb") as tflite_file:
+        tflite_file.write(tflite_model)
+    print(f"Saved {args.output_tflite}")
 
     y_true = y_test.argmax(axis=1)
     y_pred = final_model.predict(x_test, verbose=0).argmax(axis=1)

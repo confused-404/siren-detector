@@ -4,10 +4,14 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
+
+pytest.importorskip("tensorflow")
+pytest.importorskip("sklearn")
 
 from trainer import _group_split_indices, stratified_group_train_val_test_split
 
