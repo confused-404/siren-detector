@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 
 import numpy as np
 import tensorflow as tf
@@ -13,6 +14,9 @@ from helpers.middleman import training_data_from_manifest
 from helpers.training import find_epochs, train_model
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import StratifiedGroupKFold
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 
 def _min_groups_per_class(labels: np.ndarray, groups: np.ndarray) -> int:
@@ -161,17 +165,17 @@ def main() -> None:
         normalize=args.normalize,
         peak_limit=args.peak_limit,
     )
-    print("x_train:", x_train.shape, x_train.dtype)
-    print("y_train:", y_train.shape, y_train.dtype)
-    print("First label:", y_train[0])
+    logger.info("x_train: shape=%s dtype=%s", x_train.shape, x_train.dtype)
+    logger.info("y_train: shape=%s dtype=%s", y_train.shape, y_train.dtype)
+    logger.info("First label: %s", y_train[0])
 
     x_train_split, x_val, y_train_split, y_val, x_train_full, y_train_full, x_test, y_test = (
         stratified_group_train_val_test_split(x_train, y_train, groups, random_state=args.seed)
     )
 
-    print("train split:", x_train_split.shape, y_train_split.shape)
-    print("validation split:", x_val.shape, y_val.shape)
-    print("test split:", x_test.shape, y_test.shape)
+    logger.info("Train split: x=%s y=%s", x_train_split.shape, y_train_split.shape)
+    logger.info("Validation split: x=%s y=%s", x_val.shape, y_val.shape)
+    logger.info("Test split: x=%s y=%s", x_test.shape, y_test.shape)
 
     dropout_config = build_dropout_config(args)
     model = create_spec_cnn_with_custom_dropouts(
@@ -188,7 +192,7 @@ def main() -> None:
         max_epochs=args.max_epochs,
         patience=args.patience,
     )
-    print("Best epoch:", best_epoch)
+    logger.info("Best epoch: %s", best_epoch)
 
     final_model = create_spec_cnn_with_custom_dropouts(
         input_shape=x_train.shape[1:],
@@ -198,19 +202,22 @@ def main() -> None:
     train_model(final_model, (x_train_full, y_train_full), best_epoch)
 
     final_model.save(args.output_model)
-    print(f"Saved {args.output_model}")
+    logger.info("Saved Keras model to %s", args.output_model)
 
     converter = tf.lite.TFLiteConverter.from_keras_model(final_model)
     tflite_model = converter.convert()
     with open(args.output_tflite, "wb") as tflite_file:
         tflite_file.write(tflite_model)
-    print(f"Saved {args.output_tflite}")
+    logger.info("Saved TFLite model to %s", args.output_tflite)
 
     y_true = y_test.argmax(axis=1)
     y_pred = final_model.predict(x_test, verbose=0).argmax(axis=1)
 
-    print(confusion_matrix(y_true, y_pred))
-    print(classification_report(y_true, y_pred, target_names=["siren", "honk", "noise"]))
+    logger.info("Confusion matrix:\n%s", confusion_matrix(y_true, y_pred))
+    logger.info(
+        "Classification report:\n%s",
+        classification_report(y_true, y_pred, target_names=["siren", "honk", "noise"]),
+    )
 
 
 if __name__ == "__main__":

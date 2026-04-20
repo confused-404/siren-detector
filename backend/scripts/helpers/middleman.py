@@ -1,8 +1,11 @@
+import logging
 import os
 
 import numpy as np
 import pandas as pd
 from helpers.utils import waveform_to_logspec
+
+logger = logging.getLogger(__name__)
 
 LABELS = ["siren", "honk", "noise"]
 LABEL_TO_INDEX = {name: i for i, name in enumerate(LABELS)}
@@ -91,11 +94,8 @@ def load_manifest_dataset_channels_as_examples(
     if "file" not in df.columns or "event" not in df.columns:
         raise ValueError(f"Manifest must have columns ['file','event']. Found: {list(df.columns)}")
 
-    print("Manifest rows:", len(df))
-    print(df["event"].value_counts())
-
-    print("Original distribution:")
-    print(df["event"].value_counts())
+    logger.info("Manifest rows: %s", len(df))
+    logger.info("Original distribution:\n%s", df["event"].value_counts())
 
     noise_df = df[df["event"] == "noise"]
     honk_df = df[df["event"] == "honk"]
@@ -108,8 +108,7 @@ def load_manifest_dataset_channels_as_examples(
 
     df = pd.concat([noise_df, honk_df, siren_df])
 
-    print("After undersampling:")
-    print(df["event"].value_counts())
+    logger.info("Distribution after undersampling:\n%s", df["event"].value_counts())
 
     if shuffle:
         df = df.sample(frac=1.0, random_state=seed).reset_index(drop=True)
@@ -155,8 +154,8 @@ def load_manifest_dataset_channels_as_examples(
             y_list.append(y)
             group_ids.append(npy_path)
 
-    print(f"Kept {kept} channel examples")
-    print(f"Dropped {dropped} channel examples above {peak_limit}")
+    logger.info("Kept %s channel examples", kept)
+    logger.info("Dropped %s channel examples above peak limit %.3f", dropped, peak_limit)
 
     if not x_list:
         raise ValueError(

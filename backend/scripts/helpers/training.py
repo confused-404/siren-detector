@@ -1,6 +1,10 @@
+import logging
+
 import numpy as np
 import pandas as pd
 from tensorflow import keras
+
+logger = logging.getLogger(__name__)
 
 # TODO: shuffle training data before input
 
@@ -49,7 +53,7 @@ def find_epochs(
 
         csv_filename = f"accuracy_history_v{version}"
         history_df[columns_to_save].to_csv(csv_filename, index=False)
-        print(f"Training history saved to {csv_filename}")
+        logger.info("Training history saved to %s", csv_filename)
 
     best_epoch = np.argmin(history.history["val_loss"]) + 1
     return best_epoch

@@ -1,3 +1,4 @@
+import logging
 import subprocess
 import threading
 import time
@@ -11,6 +12,8 @@ from tflite_runtime.interpreter import Interpreter
 
 from status_types import StatusResponse
 from utils import waveform_to_logspec
+
+logger = logging.getLogger(__name__)
 
 LABELS = ["siren", "honk", "noise"]
 LABEL_TO_CHAR = {"siren": "s", "honk": "h", "noise": "n"}
@@ -175,7 +178,7 @@ class LiveDetector:
         return bytes(out)
 
     def start(self) -> None:
-        print("DETECTOR: start() called")
+        logger.info("Starting live detector threads")
         if self._running:
             return
         self._failure = None
@@ -226,7 +229,7 @@ class LiveDetector:
         self._failure = failure
         self._running = False
         self._stop_capture_process()
-        print(f"DETECTOR: fatal failure: {failure}")
+        logger.error("Live detector fatal failure: %s", failure)
 
     def _start_capture_process(self, cmd: list[str]) -> subprocess.Popen[bytes]:
         proc: subprocess.Popen[bytes] = subprocess.Popen(
@@ -291,13 +294,13 @@ class LiveDetector:
             "-q",
         ]
 
-        print("DETECTOR: capture loop starting arecord...")
+        logger.info("Starting arecord capture loop")
         proc = self._start_capture_process(cmd)
 
         try:
             while self._running:
                 if proc.poll() is not None:
-                    print("DETECTOR: arecord died, restarting...")
+                    logger.warning("arecord exited unexpectedly; restarting capture")
                     self._clear_capture_process(proc)
                     proc = self._start_capture_process(cmd)
 
@@ -319,7 +322,7 @@ class LiveDetector:
             self._stop_capture_process()
 
     def _infer_loop(self) -> None:
-        print("DETECTOR: infer loop running")
+        logger.info("Inference loop running")
         cfg = self.cfg
         block_len = int(cfg.sample_rate * cfg.block_seconds)
 

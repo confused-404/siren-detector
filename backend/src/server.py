@@ -1,3 +1,4 @@
+import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -8,6 +9,9 @@ from fastapi.staticfiles import StaticFiles
 
 from live_detector import DetectorConfig, LiveDetector
 from status_types import StatusResponse
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DIST_DIR = REPO_ROOT / "app" / "dist"
@@ -28,16 +32,16 @@ def build_detector_config() -> DetectorConfig:
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     global detector, startup_error
 
-    print("SERVER STARTUP: starting detector...")
+    logger.info("Starting detector during server startup")
     detector = None
     startup_error = None
     try:
         detector = LiveDetector(build_detector_config())
         detector.start()
-        print("SERVER STARTUP: detector.start() returned")
+        logger.info("Detector startup completed")
     except Exception as exc:
         startup_error = f"Detector unavailable: {exc}"
-        print(f"SERVER STARTUP: detector failed to start: {exc}")
+        logger.exception("Detector failed to start")
     try:
         yield
     finally:
