@@ -158,6 +158,11 @@ def load_manifest_dataset_channels_as_examples(
     print(f"Kept {kept} channel examples")
     print(f"Dropped {dropped} channel examples above {peak_limit}")
 
+    if not x_list:
+        raise ValueError(
+            "No training examples remained after loading the manifest and applying filters."
+        )
+
     x_train = np.stack(x_list, axis=0).astype(np.float32)
     x_train = x_train[..., np.newaxis]
     y_train = np.stack(y_list, axis=0).astype(np.float32)
