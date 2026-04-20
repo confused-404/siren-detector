@@ -15,6 +15,34 @@ from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import StratifiedGroupKFold
 
 
+def _min_groups_per_class(labels: np.ndarray, groups: np.ndarray) -> int:
+    unique_labels = np.unique(labels)
+    if unique_labels.size == 0:
+        raise ValueError("Training split requires at least one labeled example.")
+
+    return min(
+        len(np.unique(groups[labels == label]))
+        for label in unique_labels
+    )
+
+
+def _choose_split_count(
+    labels: np.ndarray,
+    groups: np.ndarray,
+    *,
+    stage_name: str,
+    minimum_required_groups: int,
+    max_splits: int = 5,
+) -> int:
+    min_groups = _min_groups_per_class(labels, groups)
+    if min_groups < minimum_required_groups:
+        raise ValueError(
+            f"{stage_name} split requires at least {minimum_required_groups} grouped clips per "
+            f"class, but the dataset only has {min_groups}."
+        )
+    return min(max_splits, min_groups)
+
+
 def _group_split_indices(
     labels: np.ndarray,
     groups: np.ndarray,
@@ -49,11 +77,17 @@ def stratified_group_train_val_test_split(
     np.ndarray,
 ]:
     labels = y_train.argmax(axis=1)
+    outer_splits = _choose_split_count(
+        labels,
+        groups,
+        stage_name="Train/validation/test",
+        minimum_required_groups=3,
+    )
 
     train_full_idx, test_idx = _group_split_indices(
         labels,
         groups,
-        n_splits=5,
+        n_splits=outer_splits,
         random_state=random_state,
     )
 
@@ -61,11 +95,17 @@ def stratified_group_train_val_test_split(
     y_train_full = y_train[train_full_idx]
     train_full_groups = groups[train_full_idx]
     train_full_labels = labels[train_full_idx]
+    inner_splits = _choose_split_count(
+        train_full_labels,
+        train_full_groups,
+        stage_name="Train/validation",
+        minimum_required_groups=2,
+    )
 
     train_idx, val_idx = _group_split_indices(
         train_full_labels,
         train_full_groups,
-        n_splits=5,
+        n_splits=inner_splits,
         random_state=random_state + 1,
     )
 
