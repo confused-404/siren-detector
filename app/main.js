@@ -35,8 +35,10 @@ app.innerHTML = `
 `;
 
 const statusBanner = document.getElementById('status-banner');
+const POLL_INTERVAL_MS = 1000;
 
 let step = 0;
+let latestRequestId = 0;
 /** @type {StatusResponse[]} */
 const testData = [
   { sound: 's', direction: -1 },
@@ -92,6 +94,8 @@ function showDashboardFault(message) {
 }
 
 async function updateDashboard() {
+  const requestId = ++latestRequestId;
+
   /** @type {StatusResponse} */
   let data;
 
@@ -109,9 +113,16 @@ async function updateDashboard() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Dashboard lost connection to the backend';
+      if (requestId !== latestRequestId) {
+        return;
+      }
       showDashboardFault(message);
       return;
     }
+  }
+
+  if (requestId !== latestRequestId) {
+    return;
   }
 
   setBanner('');
@@ -128,5 +139,12 @@ async function updateDashboard() {
   }
 }
 
-updateDashboard();
-setInterval(updateDashboard, 1000);
+async function pollDashboard() {
+  try {
+    await updateDashboard();
+  } finally {
+    window.setTimeout(pollDashboard, POLL_INTERVAL_MS);
+  }
+}
+
+void pollDashboard();
