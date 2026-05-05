@@ -4,7 +4,7 @@ A real-time audio detection system that alerts deaf drivers to sirens and honks 
 
 ## Overview
 
-Siren Detector is an embedded system designed to detect and locate emergency sirens and car honks in real-time. Running on a Raspberry Pi 5 with dual microphones, it uses a convolutional neural network to classify audio events and a GCC-PHAT algorithm to determine sound direction (left, center, or right). The system provides visual alerts through a lightweight web-based dashboard.
+Siren Detector is an embedded system designed to detect and locate emergency sirens and car honks in real-time. Running on a Raspberry Pi 5 with dual microphones, it uses a convolutional neural network (CNN) to classify audio events and a GCC-PHAT algorithm to determine sound direction (left, center, or right). The system provides visual alerts through a lightweight web-based dashboard.
 
 ### Key Features
 
