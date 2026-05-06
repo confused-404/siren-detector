@@ -84,9 +84,7 @@ The model is exported as TensorFlow/TFLite for efficient inference on edge devic
 - **Python 3.11+**
 - **FastAPI** - Web framework for API
 - **TensorFlow/TFLite** - Deep learning inference
-- **librosa** - Audio processing utilities
 - **NumPy/Pandas** - Numerical computing
-- **PyAudio/sounddevice** - Audio device interface
 
 ### Frontend
 - **Vanilla JavaScript** - No framework dependencies
@@ -114,6 +112,11 @@ The model is exported as TensorFlow/TFLite for efficient inference on edge devic
    ```bash
    cd backend
    poetry install
+   ```
+
+   For training support, install the optional training group:
+   ```bash
+   poetry install --with training
    ```
 
 3. **Frontend setup**
@@ -148,6 +151,16 @@ cd backend
 poetry run uvicorn server:app --app-dir src --host 0.0.0.0 --port 3000
 ```
 
+If trained model lives outside the repository, set `SIREN_MODEL_PATH` before starting the backend:
+
+```bash
+cd backend
+SIREN_MODEL_PATH=/absolute/path/to/trained_car_alert_model.tflite \
+poetry run uvicorn server:app --app-dir src --host 0.0.0.0 --port 3000
+```
+
+When the model is missing or invalid, the server stays up and `GET /api/status` returns `503` with a detector error.
+
 ### Backend Tests
 
 The backend includes a small `pytest` unit test suite for API lifecycle behavior, detector helpers, and spectrogram utilities.
@@ -158,6 +171,7 @@ poetry run pytest
 ```
 
 Tests live in `backend/tests/`.
+Training-related tests are skipped unless the optional `training` group is installed.
 
 ### Code Quality Checks
 
@@ -242,11 +256,18 @@ To retrain the model with custom data:
    poetry run python trainer.py
    ```
 
+   Install the optional training dependencies first if you have not already:
+   ```bash
+   cd backend
+   poetry install --with training
+   ```
+
 The trainer will:
 - Load log-spectrograms from your dataset
 - Train the CNN model with early stopping
 - Evaluate confusion matrix and classification metrics
-- Save the model as `trained_car_alert_model.h5`
+- Save the training model as `trained_car_alert_model.h5`
+- Export a deployment model as `trained_car_alert_model.tflite`
 
 ## Dashboard
 
@@ -287,20 +308,11 @@ siren-detector/
     │   ├── live_detector.py        # Real-time detection engine
     │   ├── utils.py                # Runtime utility functions
     │   └── siren_detector/
-    │       └── trained_car_alert_model.h5  # Pre-trained model
+    │       └── trained_car_alert_model.tflite  # Deployment model
     └── tests/
 ```
 
 ## Raspberry Pi Setup (Auto-Boot)
-
-### System Prerequisites
-
-Before running the detector, install the required system packages for PyAudio:
-
-```bash
-sudo apt update
-sudo apt install portaudio19-dev python3-dev build-essential
-```
 
 ### Automatic Startup
 
@@ -323,7 +335,7 @@ Update `arecord_device` in `DetectorConfig` to match your hardware.
 
 ### Model Not Loading
 
-Ensure the model file exists at the path specified in `DetectorConfig.model_path`. Verify model is a valid `.h5` file compatible with your TensorFlow version.
+Ensure the model file exists at the path specified in `DetectorConfig.model_path`. Verify model is a valid `.tflite` file compatible with `tflite-runtime`.
 
 ### High CPU Usage
 
@@ -334,7 +346,7 @@ The processing window can be tuned via:
 
 ## Acknowledgments
 
-- Audio feature extraction inspired by [librosa](https://librosa.org/) documentation
-- Direction estimation based on [GCC-PHAT](https://en.wikipedia.org/wiki/Generalized_cross-correlation) algorithm
+- Audio recording using [arecord](https://linux.die.net/man/1/arecord)
+- Direction estimation based on [GCC-PHAT](https://dsp.stackexchange.com/questions/74574/understanding-gcc-phat-as-a-feature) algorithm
 
 **Note**: This system is designed to provide audio information that is not a substitute for visual attention while driving. Always obey traffic laws and remain alert to all road conditions.

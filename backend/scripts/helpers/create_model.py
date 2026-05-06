@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from tensorflow import keras
 from tensorflow.keras import layers
 
@@ -6,6 +8,14 @@ from tensorflow.keras import layers
 INPUT_DIMENSION = 16000
 NUM_CLASSES = 3
 DROPOUT = 0.45  # 0.3 OG
+
+
+@dataclass(frozen=True)
+class SpecCnnDropoutConfig:
+    conv_block_1: float = 0.2
+    conv_block_2: float = 0.25
+    conv_block_3: float = 0.3
+    dense_layer: float = 0.35
 
 
 def create_mlp_model(input_dimension: int, num_classes: int, dropout: float) -> keras.Model:
@@ -60,25 +70,25 @@ def create_spec_cnn(
 def create_spec_cnn_with_custom_dropouts(
     input_shape: tuple[int, int, int] = (126, 257, 1),
     num_classes: int = 3,
+    dropout_config: SpecCnnDropoutConfig | None = None,
 ) -> keras.Model:
-    def get_layer_dropout(layer: str) -> float:
-        return float(input(f"Dropout for layer [{layer}]: "))
+    cfg = dropout_config or SpecCnnDropoutConfig()
 
     model = keras.Sequential(
         [
             keras.Input(shape=input_shape),
             layers.Conv2D(16, (3, 3), activation="relu", padding="same"),
             layers.MaxPooling2D((2, 2)),
-            layers.Dropout(get_layer_dropout("conv_block_1")),
+            layers.Dropout(cfg.conv_block_1),
             layers.Conv2D(32, (3, 3), activation="relu", padding="same"),
             layers.MaxPooling2D((2, 2)),
-            layers.Dropout(get_layer_dropout("conv_block_2")),
+            layers.Dropout(cfg.conv_block_2),
             layers.Conv2D(64, (3, 3), activation="relu", padding="same"),
             layers.MaxPooling2D((2, 2)),
-            layers.Dropout(get_layer_dropout("conv_block_3")),
+            layers.Dropout(cfg.conv_block_3),
             layers.Flatten(),
             layers.Dense(128, activation="relu"),
-            layers.Dropout(get_layer_dropout("dense_layer")),
+            layers.Dropout(cfg.dense_layer),
             layers.Dense(num_classes, activation="softmax"),
         ]
     )

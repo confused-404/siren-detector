@@ -1,12 +1,16 @@
 import argparse
 import csv
 import datetime as dt
+import logging
 import subprocess
 import sys
 import threading
 from pathlib import Path
 
 import numpy as np
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 ARECORD_DEVICE = "plughw:2,0"
 RATE = 16000
@@ -76,7 +80,7 @@ def record_1s_raw_int32_stereo() -> np.ndarray:
     try:
         raw = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
-        print("arecord failed. Output:\n", e.output.decode(errors="replace"), file=sys.stderr)
+        logger.error("arecord failed. Output:\n%s", e.output.decode(errors="replace"))
         raise
 
     x = np.frombuffer(raw, dtype=DTYPE)
@@ -159,22 +163,22 @@ def main() -> None:
     manifest = out_root / "manifest.csv"
     ensure_manifest(manifest)
 
-    print(HELP_TEXT)
+    logger.info("\n%s", HELP_TEXT)
 
     saved = 0
 
     if args.label is not None:
         key = args.label.strip().lower()
         if key not in COMMANDS:
-            print("Unknown --label. Must be one of:", ", ".join(COMMANDS.keys()))
+            logger.error("Unknown --label. Must be one of: %s", ", ".join(COMMANDS.keys()))
             sys.exit(2)
 
         event, direction = COMMANDS[key]
-        print(f"Continuous mode: recording '{event}_{direction}' once per second.")
-        print("Type 'q' then Enter to stop.\n")
-        print(
-            "(Start your sound, then press Enter here if you want; "
-            "it will keep recording regardless.)"
+        logger.info("Continuous mode: recording '%s_%s' once per second.", event, direction)
+        logger.info("Type 'q' then Enter to stop.\n")
+        logger.info(
+            "(Start your sound, then press Enter here if you want; it will keep recording "
+            "regardless.)"
         )
 
         stop_event = threading.Event()
@@ -196,16 +200,16 @@ def main() -> None:
 
                 peak = float(np.max(np.abs(x)))
                 saved += 1
-                print(f"[{saved}] Saved {fname} shape={x.shape} peak={peak:.3f}")
+                logger.info("[%s] Saved %s shape=%s peak=%.3f", saved, fname, x.shape, peak)
 
                 if args.count and saved >= args.count:
                     break
         except KeyboardInterrupt:
-            print("\nStopped.")
+            logger.info("Stopped.")
 
         stop_event.set()
-        print(f"Done. Total clips saved: {saved}")
-        print(f"Manifest: {manifest}")
+        logger.info("Done. Total clips saved: %s", saved)
+        logger.info("Manifest: %s", manifest)
         return
 
     try:
@@ -216,7 +220,7 @@ def main() -> None:
             if cmd == "q":
                 break
             if cmd not in COMMANDS:
-                print("Unknown label. Valid:", ", ".join(list(COMMANDS.keys()) + ["q"]))
+                logger.warning("Unknown label. Valid: %s", ", ".join(list(COMMANDS.keys()) + ["q"]))
                 continue
 
             event, direction = COMMANDS[cmd]
@@ -233,16 +237,16 @@ def main() -> None:
             append_manifest(manifest, fpath, event, direction, args.normalize)
 
             peak = float(np.max(np.abs(x)))
-            print(f"Saved {fname}  shape={x.shape}  peak={peak:.3f}")
+            logger.info("Saved %s shape=%s peak=%.3f", fname, x.shape, peak)
 
             saved += 1
             if args.count and saved >= args.count:
                 break
     except KeyboardInterrupt:
-        print("\nStopped.")
+        logger.info("Stopped.")
 
-    print(f"Done. Total clips saved: {saved}")
-    print(f"Manifest: {manifest}")
+    logger.info("Done. Total clips saved: %s", saved)
+    logger.info("Manifest: %s", manifest)
 
 
 if __name__ == "__main__":

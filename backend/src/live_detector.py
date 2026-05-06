@@ -1,16 +1,19 @@
+import logging
 import subprocess
 import threading
 import time
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import IO
+from typing import IO, Any, Protocol, cast
 
 import numpy as np
-import tensorflow as tf
+from tflite_runtime.interpreter import Interpreter
 
 from status_types import StatusResponse
 from utils import waveform_to_logspec
+
+logger = logging.getLogger(__name__)
 
 LABELS = ["siren", "honk", "noise"]
 LABEL_TO_CHAR = {"siren": "s", "honk": "h", "noise": "n"}
@@ -18,7 +21,7 @@ LABEL_TO_CHAR = {"siren": "s", "honk": "h", "noise": "n"}
 
 @dataclass
 class DetectorConfig:
-    model_path: str = "siren_detector/ai/trained_car_alert_model.h5"
+    model_path: str = "siren_detector/ai/trained_car_alert_model.tflite"
     sample_rate: int = 16000
     channels: int = 2
     block_seconds: float = 1.0
@@ -39,6 +42,70 @@ class DetectorConfig:
 
     arecord_device: str = "plughw:2,0"
     arecord_format: str = "S32_LE"
+
+
+class InferenceModel(Protocol):
+    def predict(self, batch: np.ndarray) -> np.ndarray: ...
+
+
+class TFLiteModelRunner:
+    def __init__(self, model_path: str):
+        self._interpreter = Interpreter(model_path=model_path)
+        self._interpreter.allocate_tensors()
+        self._input_detail: dict[str, Any] = self._interpreter.get_input_details()[0]
+        self._output_detail: dict[str, Any] = self._interpreter.get_output_details()[0]
+
+    def _resize_input_if_needed(self, shape: tuple[int, ...]) -> None:
+        current_shape = tuple(int(dim) for dim in self._input_detail["shape"])
+        if current_shape == shape:
+            return
+
+        self._interpreter.resize_tensor_input(self._input_detail["index"], shape, strict=False)
+        self._interpreter.allocate_tensors()
+        self._input_detail = self._interpreter.get_input_details()[0]
+        self._output_detail = self._interpreter.get_output_details()[0]
+
+    @staticmethod
+    def _quantize_input(values: np.ndarray, detail: dict[str, object]) -> np.ndarray:
+        dtype = np.dtype(cast(Any, detail["dtype"]))
+        if np.issubdtype(dtype, np.floating):
+            return values.astype(dtype, copy=False)
+
+        scale, zero_point = cast(tuple[float, int], detail["quantization"])
+        if scale == 0:
+            raise ValueError("TFLite model input has invalid quantization scale 0")
+
+        quantized = np.round(values / scale + zero_point)
+        limits = np.iinfo(dtype)
+        return np.clip(quantized, limits.min, limits.max).astype(dtype)
+
+    @staticmethod
+    def _dequantize_output(values: np.ndarray, detail: dict[str, object]) -> np.ndarray:
+        dtype = np.dtype(cast(Any, detail["dtype"]))
+        if np.issubdtype(dtype, np.floating):
+            return values.astype(np.float32, copy=False)
+
+        scale, zero_point = cast(tuple[float, int], detail["quantization"])
+        if scale == 0:
+            raise ValueError("TFLite model output has invalid quantization scale 0")
+
+        return (values.astype(np.float32) - zero_point) * scale
+
+    def predict(self, batch: np.ndarray) -> np.ndarray:
+        outputs: list[np.ndarray] = []
+
+        for sample in np.asarray(batch, dtype=np.float32):
+            sample_batch = np.expand_dims(sample, axis=0)
+            self._resize_input_if_needed(sample_batch.shape)
+
+            input_tensor = self._quantize_input(sample_batch, self._input_detail)
+            self._interpreter.set_tensor(self._input_detail["index"], input_tensor)
+            self._interpreter.invoke()
+
+            output_tensor = self._interpreter.get_tensor(self._output_detail["index"])
+            outputs.append(self._dequantize_output(output_tensor, self._output_detail)[0])
+
+        return np.stack(outputs, axis=0)
 
 
 def gcc_phat_tdoa(x: np.ndarray, y: np.ndarray, fs: int) -> float:
@@ -84,7 +151,7 @@ def tau_to_direction(tau: float, cfg: DetectorConfig) -> int:
 class LiveDetector:
     def __init__(self, cfg: DetectorConfig):
         self.cfg = cfg
-        self.model = tf.keras.models.load_model(cfg.model_path, compile=False)
+        self.model: InferenceModel = TFLiteModelRunner(cfg.model_path)
 
         self._lock = threading.Lock()
         self._running = False
@@ -98,6 +165,8 @@ class LiveDetector:
         self._audio_lock = threading.Lock()
         self._audio_buf = np.zeros((0, cfg.channels), dtype=np.float32)
         self._cap_thread: threading.Thread | None = None
+        self._capture_proc: subprocess.Popen[bytes] | None = None
+        self._capture_proc_lock = threading.Lock()
 
     def _read_exact(self, pipe: IO[bytes], nbytes: int) -> bytes:
         out = bytearray()
@@ -109,7 +178,7 @@ class LiveDetector:
         return bytes(out)
 
     def start(self) -> None:
-        print("DETECTOR: start() called")
+        logger.info("Starting live detector threads")
         if self._running:
             return
         self._failure = None
@@ -127,6 +196,7 @@ class LiveDetector:
 
     def stop(self) -> None:
         self._running = False
+        self._stop_capture_process()
         if self._thread:
             self._thread.join(timeout=2)
         if self._cap_thread:
@@ -158,7 +228,46 @@ class LiveDetector:
             return
         self._failure = failure
         self._running = False
-        print(f"DETECTOR: fatal failure: {failure}")
+        self._stop_capture_process()
+        logger.error("Live detector fatal failure: %s", failure)
+
+    def _start_capture_process(self, cmd: list[str]) -> subprocess.Popen[bytes]:
+        proc: subprocess.Popen[bytes] = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        with self._capture_proc_lock:
+            self._capture_proc = proc
+        return proc
+
+    def _clear_capture_process(self, proc: subprocess.Popen[bytes]) -> None:
+        with self._capture_proc_lock:
+            if self._capture_proc is proc:
+                self._capture_proc = None
+
+    def _stop_capture_process(self) -> None:
+        with self._capture_proc_lock:
+            proc = self._capture_proc
+            self._capture_proc = None
+
+        if proc is None:
+            return
+
+        try:
+            if proc.stdout is not None:
+                proc.stdout.close()
+        except Exception:
+            pass
+
+        try:
+            proc.terminate()
+            proc.wait(timeout=1)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
 
     def _capture_loop(self) -> None:
         cfg = self.cfg
@@ -185,14 +294,15 @@ class LiveDetector:
             "-q",
         ]
 
-        print("DETECTOR: capture loop starting arecord...")
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        logger.info("Starting arecord capture loop")
+        proc = self._start_capture_process(cmd)
 
         try:
             while self._running:
                 if proc.poll() is not None:
-                    print("DETECTOR: arecord died, restarting...")
-                    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                    logger.warning("arecord exited unexpectedly; restarting capture")
+                    self._clear_capture_process(proc)
+                    proc = self._start_capture_process(cmd)
 
                 assert proc.stdout is not None
                 raw = self._read_exact(proc.stdout, frame_bytes)
@@ -208,13 +318,11 @@ class LiveDetector:
                     if self._audio_buf.shape[0] > block_len:
                         self._audio_buf = self._audio_buf[-block_len:, :]
         finally:
-            try:
-                proc.kill()
-            except Exception:
-                pass
+            self._clear_capture_process(proc)
+            self._stop_capture_process()
 
     def _infer_loop(self) -> None:
-        print("DETECTOR: infer loop running")
+        logger.info("Inference loop running")
         cfg = self.cfg
         block_len = int(cfg.sample_rate * cfg.block_seconds)
 
@@ -246,7 +354,7 @@ class LiveDetector:
                 np.float32
             )
 
-            probs = self.model.predict(X, verbose=0)
+            probs = self.model.predict(X)
             probs_mean = probs.mean(axis=0).astype(np.float32)
 
             self._ema_probs = (
