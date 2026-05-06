@@ -34,7 +34,7 @@ class DetectorConfig:
 
     mic_distance_m: float = 0.1  # TODO: measure and edit
     speed_of_sound: float = 343.0
-    direction_deadband_deg: float = 10.0
+    direction_deadband_deg: float = 25.0
 
     smooth_alpha: float = 0.6
 
