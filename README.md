@@ -52,7 +52,7 @@ Siren Detector is an embedded system designed to detect and locate emergency sir
 
 ### Machine Learning Model
 
-Initially, a multilayer perceptron (MLP) was trained on raw audio frequencies, but achieved only ~85% accuracy. The approach was switched to a **log-spectrogram CNN** which significantly improved performance by:
+Initially, a multilayer perceptron (MLP) was trained on raw audio frequencies, but achieved only ~85% accuracy. The approach was switched to a **log-spectrogram convolutional neural network (CNN)** which significantly improved performance by:
 
 1. Converting raw waveform to STFT representation
 2. Computing log-magnitude spectrograms for better frequency resolution
