@@ -76,7 +76,6 @@ The model is exported as TensorFlow/TFLite for efficient inference on edge devic
 - **Raspberry Pi 5** (or compatible SBC with audio support)
 - **2× I2S INMP441 Microphones** (or similar I2S-compatible digital microphones)
 - Power supply and network connectivity
-- Optional: enclosure for weatherproofing
 
 ## Software Stack
 
