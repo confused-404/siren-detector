@@ -57,7 +57,7 @@ Initially, a multilayer perceptron (MLP) was trained on raw audio frequencies, b
 1. Converting raw waveform to STFT representation: sirens and horns are defined not only by which frequencies are present, but also by how those frequencies change over time.
 2. Computing log-magnitude spectrograms for better frequency resolution: a logarithmic scale compresses large magnitude differences and better reflects how humans perceive loudness.
 3. Using convolutional layers to capture temporal and spectral patterns: CNNs can learn local patterns in spectrograms, such as repeating frequency structures (common in sirens).
-4. Training on balanced dataset of siren, honk, and noise samples: spectrogram-based models are typically more robust to small timing shifts and background noise than models trained directly on frequencies.
+4. Spectrogram-based models are typically more robust to small timing shifts and background noise than models trained directly on frequencies.
 
 The model is exported as TensorFlow/TFLite for efficient inference on edge devices.
 
