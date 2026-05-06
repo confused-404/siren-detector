@@ -69,7 +69,7 @@ The model is exported as TensorFlow/TFLite for efficient inference on edge devic
    - Log-magnitude spectrogram computation
    - Peak normalization (0.5 limit) to handle varying input levels
 3. **Inference**: Pre-trained CNN classifies into 3 classes
-4. **Direction Estimation**: GCC-PHAT algorithm on dual channels computes time delay of arrival, converted to directional indicator (-1: left, 0: center, +1: right)
+4. **Direction Estimation**: GCC-PHAT algorithm on dual channels computes time delay of arrival, converted to directional indicator (-1: left, 0: center, +1: right). Threshold for angle that is classified center can be adjusted in DetectorConfig.
 
 ## Hardware Requirements
 
@@ -238,7 +238,7 @@ DetectorConfig(
     fft_length=512,             # FFT size
     mic_distance_m=0.1,         # Distance between microphones
     speed_of_sound=343.0,       # Speed of sound (m/s)
-    direction_deadband_deg=10.0,# Direction threshold
+    direction_deadband_deg=25.0,# Direction threshold
     arecord_device="plughw:2,0",# ALSA device name
 )
 ```
