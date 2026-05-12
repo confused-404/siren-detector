@@ -80,7 +80,7 @@ The model is exported as TensorFlow/TFLite for efficient inference on edge devic
 ## Software Stack
 
 ### Backend
-- **Python 3.11+**
+- **Python 3.11**
 - **FastAPI** - Web framework for API
 - **TensorFlow/TFLite** - Deep learning inference
 - **NumPy/Pandas** - Numerical computing
