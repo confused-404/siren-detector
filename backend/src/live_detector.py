@@ -32,7 +32,7 @@ class DetectorConfig:
     frame_step: int = 128
     fft_length: int = 512
 
-    mic_distance_m: float = 0.1  # TODO: measure and edit
+    mic_distance_m: float = 0.228  # TODO: measure and edit
     speed_of_sound: float = 343.0
     direction_deadband_deg: float = 25.0
 
@@ -108,9 +108,15 @@ class TFLiteModelRunner:
         return np.stack(outputs, axis=0)
 
 
-def gcc_phat_tdoa(x: np.ndarray, y: np.ndarray, fs: int) -> float:
+def gcc_phat_tdoa(
+    x: np.ndarray,
+    y: np.ndarray,
+    fs: int,
+    max_tau: float | None = None,
+) -> tuple[float, float]:
     """
     Estimate relative arrival delay with the GCC-PHAT method.
+    Returns (tau, peak_confidence).
     """
     n = 1
     L = len(x) + len(y)
@@ -128,10 +134,22 @@ def gcc_phat_tdoa(x: np.ndarray, y: np.ndarray, fs: int) -> float:
     cc = np.fft.irfft(R, n=n)
     cc = np.concatenate((cc[-(n // 2) :], cc[: (n // 2)]))
 
-    max_shift = int(n // 2)
-    shift = np.argmax(cc) - max_shift
-    tau = shift / float(fs)
-    return tau
+    center = n // 2
+
+    if max_tau is None:
+        max_shift = center
+    else:
+        max_shift = min(int(fs * max_tau), center)
+
+    cc_window = cc[center - max_shift : center + max_shift + 1]
+    rel_shift = int(np.argmax(cc_window)) - max_shift
+    tau = rel_shift / float(fs)
+
+    peak = float(np.max(np.abs(cc_window)))
+    mean = float(np.mean(np.abs(cc_window)) + 1e-12)
+    confidence = peak / mean
+
+    return tau, confidence
 
 
 def tau_to_direction(tau: float, cfg: DetectorConfig) -> int:
@@ -364,7 +382,8 @@ class LiveDetector:
             idx = int(np.argmax(self._ema_probs))
             label = LABELS[idx]
 
-            tau = gcc_phat_tdoa(left, right, cfg.sample_rate)
+            max_tau = cfg.mic_distance_m / cfg.speed_of_sound
+            tau, _confidence = gcc_phat_tdoa(left, right, cfg.sample_rate, max_tau=max_tau)
             direction = tau_to_direction(tau, cfg) if label != "noise" else 0
 
             status: StatusResponse = {"sound": LABEL_TO_CHAR[label], "direction": int(direction)}
