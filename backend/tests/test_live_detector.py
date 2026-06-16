@@ -55,9 +55,21 @@ def test_gcc_phat_tdoa_detects_relative_delay() -> None:
     base[40] = 1.0
 
     delayed = np.roll(base, 4)
-    tau = gcc_phat_tdoa(base, delayed, fs)
+    tau, confidence = gcc_phat_tdoa(base, delayed, fs)
 
     assert tau == pytest.approx(-4 / fs, abs=1e-6)
+    assert confidence > 1.0
+
+
+def test_gcc_phat_tdoa_respects_max_tau() -> None:
+    fs = 16000
+    base = np.zeros(512, dtype=np.float32)
+    base[40] = 1.0
+
+    delayed = np.roll(base, 20)
+    tau, _confidence = gcc_phat_tdoa(base, delayed, fs, max_tau=10 / fs)
+
+    assert abs(tau) <= 10 / fs
 
 
 def test_read_exact_reads_until_requested_size() -> None:
@@ -215,7 +227,10 @@ def test_infer_loop_updates_status_for_detected_siren(monkeypatch) -> None:
         "live_detector.waveform_to_logspec",
         lambda waveform, frame_length, frame_step, fft_length: np.ones((2, 2), dtype=np.float32),
     )
-    monkeypatch.setattr("live_detector.gcc_phat_tdoa", lambda left, right, fs: 0.05)
+    monkeypatch.setattr(
+        "live_detector.gcc_phat_tdoa",
+        lambda left, right, fs, max_tau=None: (0.05, 10.0),
+    )
 
     def stop_after_iteration(_: float) -> None:
         detector._running = False
@@ -244,7 +259,10 @@ def test_infer_loop_forces_noise_direction_to_center(monkeypatch) -> None:
         "live_detector.waveform_to_logspec",
         lambda waveform, frame_length, frame_step, fft_length: np.ones((2, 2), dtype=np.float32),
     )
-    monkeypatch.setattr("live_detector.gcc_phat_tdoa", lambda left, right, fs: -0.05)
+    monkeypatch.setattr(
+        "live_detector.gcc_phat_tdoa",
+        lambda left, right, fs, max_tau=None: (-0.05, 10.0),
+    )
 
     def stop_after_iteration(_: float) -> None:
         detector._running = False
