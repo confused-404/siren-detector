@@ -30,7 +30,7 @@ class DetectorConfig:
     direction_deadband_deg: float = 15.0
     direction_center_deg: float = 10.0
     direction_side_deg: float = 20.0
-    direction_conf_min: float = 2.2
+    direction_conf_min: float = 1.55
     direction_history: int = 7
     gcc_phat_beta: float = 0.5
     gcc_bandpass_low_hz: float = 100.0
@@ -145,9 +145,9 @@ def tau_to_direction(tau: float, cfg: DetectorConfig, last_direction: int = 0) -
     theta = tau_to_theta(tau, cfg)
 
     if theta <= -cfg.direction_side_deg:
-        return -1
-    if theta >= cfg.direction_side_deg:
         return 1
+    if theta >= cfg.direction_side_deg:
+        return -1
     if abs(theta) <= cfg.direction_center_deg:
         return 0
     return last_direction
