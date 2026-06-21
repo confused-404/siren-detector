@@ -24,9 +24,9 @@ class DetectorConfig:
     frame_step: int = 128
     fft_length: int = 512
 
-    mic_distance_m: float = 0.1 # TODO: measure and edit
-    speed_of_sound: float = 343.0
-    direction_deadband_deg: float = 10.0
+    mic_distance_m: float = 0.23 # TODO: measure and edit
+    speed_of_sound: float = 343.24
+    direction_deadband_deg: float = 15.0
 
     smooth_alpha: float = 0.6
 
@@ -35,9 +35,10 @@ class DetectorConfig:
     arecord_device: str = "plughw:2,0"
     arecord_format: str = "S32_LE"
 
-def gcc_phat_tdoa(x: np.ndarray, y: np.ndarray, fs: int) -> float:
+def gcc_phat_tdoa(x: np.ndarray, y: np.ndarray, fs: int, max_tau: Optional[float] = None):
     """
-    Use GCC_PHAT to estimate time delays
+    Estimate TDOA using GCC-PHAT, constrained to a physically valid delay range.
+    Returns (tau, peak_confidence).
     """
     n = 1
     L = len(x) + len(y)
@@ -53,13 +54,25 @@ def gcc_phat_tdoa(x: np.ndarray, y: np.ndarray, fs: int) -> float:
     R /= denom
 
     cc = np.fft.irfft(R, n=n)
-    cc = np.concatenate((cc[-(n//2):], cc[:(n//2)]))
+    cc = np.concatenate((cc[-(n // 2):], cc[:(n // 2)]))
 
-    max_shift = int(n // 2)
-    shift = np.argmax(cc) - max_shift
-    tau = shift / float(fs)
-    return tau
+    center = n // 2
 
+    if max_tau is None:
+        max_shift = center
+    else:
+        max_shift = min(int(fs * max_tau), center)
+
+    cc_window = cc[center - max_shift : center + max_shift + 1]
+    rel_shift = np.argmax(cc_window) - max_shift
+    tau = rel_shift / float(fs)
+
+    # crude confidence: peak relative to mean abs correlation in valid window
+    peak = float(np.max(np.abs(cc_window)))
+    mean = float(np.mean(np.abs(cc_window)) + 1e-12)
+    confidence = peak / mean
+
+    return tau, confidence
 
 def tau_to_direction(tau: float, cfg: DetectorConfig) -> int:
     """
@@ -95,6 +108,8 @@ class LiveDetector:
         self._audio_lock = threading.Lock()
         self._audio_buf = np.zeros((0, cfg.channels), dtype=np.float32)
         self._cap_thread: Optional[threading.Thread] = None
+
+        self._tau_hist = []
 
     def _read_exact(self, pipe, nbytes: int) -> bytes:
         out = bytearray()
@@ -181,6 +196,13 @@ class LiveDetector:
         cfg = self.cfg
         block_len = int(cfg.sample_rate * cfg.block_seconds)
 
+        print(
+            f"CONFIG fs={cfg.sample_rate} "
+            f"d={cfg.mic_distance_m} "
+            f"max_tau={cfg.mic_distance_m / cfg.speed_of_sound * 1e6:.0f}us "
+            f"max_shift={int(cfg.sample_rate * cfg.mic_distance_m / cfg.speed_of_sound)}"
+        )
+
         while self._running:
             time.sleep(cfg.hop_seconds)
 
@@ -215,8 +237,30 @@ class LiveDetector:
             idx = int(np.argmax(self._ema_probs))
             label = LABELS[idx]
 
-            tau = gcc_phat_tdoa(left, right, cfg.sample_rate)
-            direction = tau_to_direction(tau, cfg) if label != "noise" else 0
+            max_tau = cfg.mic_distance_m / cfg.speed_of_sound
+            tau, tau_conf = gcc_phat_tdoa(left, right, cfg.sample_rate, max_tau=max_tau)
+            
+            s = np.clip(
+                (tau * cfg.speed_of_sound) / cfg.mic_distance_m,
+                -1.0,
+                1.0
+            )
+            theta = np.degrees(np.arcsin(s))
+
+            print(
+                f"tau={tau*1e6:7.0f}us "
+                f"theta={theta:6.1f} "
+                f"conf={tau_conf:5.2f} "
+                f"label={label}"
+            )
+
+            if tau_conf >= 3.0:
+                self._tau_hist.append(tau)
+                self._tau_hist = self._tau_hist[-5:]
+                tau_for_dir = float(np.median(self._tau_hist))
+                direction = tau_to_direction(tau_for_dir, cfg) if label != "noise" else 0
+            else:
+                direction = self._latest["direction"]
 
             status = {"sound": LABEL_TO_CHAR[label], "direction": int(direction)}
             with self._lock:
